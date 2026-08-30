@@ -58,6 +58,30 @@ P1 で完成した基盤（プロジェクト・フォルダ・ファイル・�
 - https://ai.google.dev/gemini-api/docs/interactions/structured-output
 - https://ai.google.dev/gemini-api/docs/interactions/document-processing
 
+### 3.1 実機検証の結果（2026-08-30 実施）
+
+`@google/genai` v2.19.0 で実際に呼び出して確認した事実。検証用の架空の会議メモを
+送信しており、プロジェクト情報は含めていない。
+
+| 確認事項 | 結果 |
+|---|---|
+| SDK に `ai.interactions.create` が存在する | あり（`create` / `get` / `delete` / `cancel`） |
+| 構造化出力の呼び出し形 | `response_format: { type:'text', mime_type:'application/json', schema }` で成功 |
+| 結果の取り出し | `interaction.output_text`（JSON 文字列）を `JSON.parse` する |
+| レスポンスのフィールド | `id, status, usage, created, updated, service_tier, steps, object, model, output_text` |
+| トークン使用量 | `interaction.usage` に `total_input_tokens` / `total_output_tokens` / `total_thought_tokens` |
+| `gemini-3.7-flash` | **500「currently experiencing high demand」を継続的に返した** |
+| `gemini-3.5-flash` | 成功。約 18 秒（入力 43 / 思考 949 / 出力 290 トークン） |
+| 抽出品質 | 「来週まで」「適宜」といった曖昧な期限を不透明点として正しく指摘した |
+| `due_date` の実際の出力 | **`YYYY-MM-DD` ではなく「来週まで」「適宜」など自然言語が返った** |
+
+この検証を受けて、以下を設計に反映する。
+
+1. **モデルのフォールバック**: 既定モデルが 5xx を返した場合、フォールバックモデルへ切り替えて再試行する
+2. **長い応答時間への対応**: 20 秒超を前提に、Server Action の最大実行時間を延ばし、UI に待機状態を出す
+3. **期限の扱い**: `due_date` は `YYYY-MM-DD` か空文字のみを許可し、
+   「来週」「適宜」のような曖昧な表現は空文字にしたうえで不透明点メモに回すようプロンプトで指示する
+
 ---
 
 ## 4. R-21 に基づく外部送信の内容
@@ -227,7 +251,8 @@ P1 と同じく `projects.owner_id = auth.uid()` を起点に RLS を設定す�
       description: string     // 何をするかの説明
       priority: 'high' | 'medium' | 'low'
       assignee: string        // 文書から読み取れる担当者。不明なら空文字
-      due_date: string        // YYYY-MM-DD。不明なら空文字
+      due_date: string        // YYYY-MM-DD のみ。曖昧・不明なら空文字とし、
+                              // 原文の表現は ambiguity_note に記載させる
       ambiguity_note: string  // 記述が不透明な点。なければ空文字
       ai_suggestion: string   // タスク化に向けた改善・修正案。なければ空文字
     }
@@ -250,6 +275,7 @@ Server Action は P1 と同じ判別可能ユニオンで返す。追加する�
 | `TEXT_TOO_LONG` | 抽出テキストが上限超過 | ドキュメントが大きすぎます。分割してお試しください。 |
 | `TEXT_EXTRACTION_FAILED` | officeparser が失敗 | ファイルからテキストを取り出せませんでした。 |
 | `AI_REQUEST_FAILED` | API 通信失敗・タイムアウト | AI への問い合わせに失敗しました。時間をおいてお試しください。 |
+| `AI_MODEL_UNAVAILABLE` | 既定・フォールバックの両モデルが 5xx | AI が混雑しています。時間をおいてお試しください。 |
 | `AI_RESPONSE_INVALID` | 出力がスキーマに不一致 | AI の応答を解釈できませんでした。もう一度お試しください。 |
 
 いずれも `extraction_runs.error_message` に記録し、後から原因を追える状態にする。
@@ -313,6 +339,7 @@ Server Action は P1 と同じ判別可能ユニオンで返す。追加する�
 |---|---|---|
 | `GEMINI_API_KEY` | Gemini API の認証キー | **サーバー専用**。`NEXT_PUBLIC_` を付けない |
 | `GEMINI_MODEL` | 使用モデル。未設定時は `gemini-3.7-flash` | サーバー専用 |
+| `GEMINI_FALLBACK_MODEL` | 既定モデルが 5xx のときの代替。未設定時は `gemini-3.5-flash` | サーバー専用 |
 
 ---
 
@@ -329,4 +356,5 @@ Server Action は P1 と同じ判別可能ユニオンで返す。追加する�
 9. 上限超過・API 失敗・スキーマ不一致が日本語で表示され、`extraction_runs` に記録される
 10. 他ユーザーのタスクに一切アクセスできない（RLS の確認）
 11. `GEMINI_API_KEY` がクライアントバンドルに含まれない
-12. `lint` / `typecheck` / `test` / `build` がすべてグリーン
+12. 既定モデルが 5xx を返してもフォールバックモデルで抽出が完了する
+13. `lint` / `typecheck` / `test` / `build` がすべてグリーン
