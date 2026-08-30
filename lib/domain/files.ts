@@ -17,6 +17,15 @@ export function getExtension(filename: string): string {
   return filename.slice(index + 1).toLowerCase()
 }
 
+/**
+ * 改行コードを LF に統一する。
+ * Server Action の FormData 経由で送られたテキストは CRLF に正規化されるため、
+ * 保存前に必ず通して差分とバイト数のぶれを防ぐ。
+ */
+export function normalizeLineEndings(text: string): string {
+  return text.replace(/\r\n?/g, '\n')
+}
+
 export function detectFileKind(filename: string): FileKind {
   const extension = getExtension(filename)
   if (extension === 'md') return 'markdown'

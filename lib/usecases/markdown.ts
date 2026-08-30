@@ -1,3 +1,4 @@
+import { normalizeLineEndings } from '@/lib/domain/files'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { FileVersionRepository } from '@/lib/repositories/file-versions'
 import type { FileRepository } from '@/lib/repositories/files'
@@ -19,13 +20,14 @@ export async function saveMarkdown(
     return err('VALIDATION_ERROR', 'このファイルはアプリ内で編集できません。')
   }
 
+  const content = normalizeLineEndings(input.content)
   const nextVersion = file.currentVersion + 1
-  const size = new TextEncoder().encode(input.content).length
+  const size = new TextEncoder().encode(content).length
 
   await deps.versions.create({
     fileId: file.id,
     version: nextVersion,
-    content: input.content,
+    content,
     storagePath: null,
     size,
     authorId: input.authorId,

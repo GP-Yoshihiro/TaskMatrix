@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { buildStoragePath, validateUpload } from '@/lib/domain/files'
+import { buildStoragePath, normalizeLineEndings, validateUpload } from '@/lib/domain/files'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -42,12 +42,13 @@ export async function uploadFileAction(formData: FormData): Promise<Result<null>
     })
 
     if (isText) {
-      const content = await file.text()
+      const content = normalizeLineEndings(await file.text())
+      const size = new TextEncoder().encode(content).length
       const { error } = await supabase.from('file_versions').insert({
         file_id: created.id,
         version: 1,
         content,
-        size: file.size,
+        size,
         author_id: user.id,
         note: 'アップロード',
       })

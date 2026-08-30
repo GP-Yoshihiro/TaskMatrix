@@ -5,6 +5,7 @@ import {
   buildStoragePath,
   detectFileKind,
   getExtension,
+  normalizeLineEndings,
   validateUpload,
 } from '@/lib/domain/files'
 
@@ -125,5 +126,27 @@ describe('buildStoragePath', () => {
       filename: '2026.08.30.議事録.docx',
     })
     expect(path).toBe('proj-1/file-1/2/file-1.docx')
+  })
+})
+
+describe('normalizeLineEndings', () => {
+  it('CRLF を LF に変換する', () => {
+    expect(normalizeLineEndings('a\r\nb\r\nc')).toBe('a\nb\nc')
+  })
+
+  it('単独の CR も LF に変換する', () => {
+    expect(normalizeLineEndings('a\rb')).toBe('a\nb')
+  })
+
+  it('LF のみのテキストは変更しない', () => {
+    expect(normalizeLineEndings('a\nb\n')).toBe('a\nb\n')
+  })
+
+  it('混在していても LF に統一する', () => {
+    expect(normalizeLineEndings('a\r\nb\nc\rd')).toBe('a\nb\nc\nd')
+  })
+
+  it('CR を含まない文字列をそのまま返す', () => {
+    expect(normalizeLineEndings('あいうえお')).toBe('あいうえお')
   })
 })

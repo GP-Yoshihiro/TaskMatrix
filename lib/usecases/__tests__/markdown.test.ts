@@ -97,3 +97,28 @@ describe('saveMarkdown', () => {
     )
   })
 })
+
+describe('saveMarkdown の改行正規化', () => {
+  it('CRLF を LF に正規化して保存する', async () => {
+    const deps = makeDeps(existingFile)
+    await saveMarkdown(deps, {
+      fileId: 'f1',
+      content: '1行目\r\n2行目\r\n',
+      authorId: 'u1',
+    })
+
+    expect(deps.versions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '1行目\n2行目\n' }),
+    )
+  })
+
+  it('正規化後のバイト数でサイズを記録する', async () => {
+    const deps = makeDeps(existingFile)
+    await saveMarkdown(deps, { fileId: 'f1', content: 'a\r\nb', authorId: 'u1' })
+
+    // 'a\nb' = 3 バイト（CRLF のままなら 4 バイト）
+    expect(deps.files.updateForNewVersion).toHaveBeenCalledWith(
+      expect.objectContaining({ size: 3 }),
+    )
+  })
+})
