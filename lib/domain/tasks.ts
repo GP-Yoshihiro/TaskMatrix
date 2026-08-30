@@ -65,3 +65,44 @@ export function normalizeDueDate(value: string): string | null {
 
   return valid ? trimmed : null
 }
+
+/** 優先度の表示順。数値が小さいほど上に出す */
+const PRIORITY_ORDER: Record<TaskPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+}
+
+type Displayable = {
+  status: TaskStatus
+  priority: TaskPriority
+  dueDate: string | null
+}
+
+/**
+ * 表示用に並べ替える。優先度の高い順、同じなら期限の早い順。
+ * 期限のないタスクは末尾に置く（期限が決まっているものを先に片付けたいため）。
+ * 元の配列は書き換えない。
+ */
+export function sortTasksForDisplay<T extends Displayable>(tasks: T[]): T[] {
+  return [...tasks].sort((a, b) => {
+    const byPriority = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+    if (byPriority !== 0) return byPriority
+
+    if (a.dueDate === b.dueDate) return 0
+    if (a.dueDate === null) return 1
+    if (b.dueDate === null) return -1
+    return a.dueDate < b.dueDate ? -1 : 1
+  })
+}
+
+/** カンバン表示のためにステータスごとに振り分ける。空の列も必ず返す */
+export function groupTasksByStatus<T extends Displayable>(
+  tasks: T[],
+): Record<TaskStatus, T[]> {
+  const grouped = { todo: [], doing: [], done: [] } as Record<TaskStatus, T[]>
+  for (const task of tasks) {
+    grouped[task.status].push(task)
+  }
+  return grouped
+}

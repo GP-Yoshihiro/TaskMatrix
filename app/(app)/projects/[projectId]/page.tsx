@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { FileList } from '@/components/app/file-list'
 import { FileUploadForm } from '@/components/app/file-upload-form'
@@ -31,7 +32,10 @@ export default async function ProjectDetailPage({
 
   return (
     <div style={{ display: 'grid', gap: 32, maxWidth: 900 }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name}</h1>
+      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name}</h1>
+        <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
+      </header>
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>
         <h2 style={{ fontWeight: 600 }}>ファイル</h2>
