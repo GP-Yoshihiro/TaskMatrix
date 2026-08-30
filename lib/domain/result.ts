@@ -8,6 +8,12 @@ export type AppErrorCode =
   | 'FILE_TOO_LARGE'
   | 'UNSUPPORTED_FILE_TYPE'
   | 'STORAGE_ERROR'
+  | 'AI_NOT_CONFIGURED'
+  | 'TEXT_TOO_LONG'
+  | 'TEXT_EXTRACTION_FAILED'
+  | 'AI_REQUEST_FAILED'
+  | 'AI_MODEL_UNAVAILABLE'
+  | 'AI_RESPONSE_INVALID'
   | 'UNKNOWN'
 
 export type AppError = {
