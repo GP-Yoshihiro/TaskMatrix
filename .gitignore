@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ローカルメモ（Obsidian等・リポジトリ管理対象外）
+/Claude Code/

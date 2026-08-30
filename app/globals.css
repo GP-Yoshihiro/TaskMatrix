@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+/* ============================================================
+   デザイントークン
+   プラットフォーム（apple / windows）× 配色（light / dark）
+   コンポーネントはこれらの変数のみを参照する
+   ============================================================ */
+
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f5f5f7;
+  --color-border: #d2d2d7;
+  --color-fg: #1d1d1f;
+  --color-fg-muted: #6e6e73;
+  --color-accent: #0071e3;
+  --color-accent-fg: #ffffff;
+  --color-danger: #d70015;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.10);
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+
+  --space-unit: 4px;
+  --motion-duration: 320ms;
+  --motion-easing: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[data-platform="windows"] {
+  --color-bg: #ffffff;
+  --color-surface: #f3f3f3;
+  --color-border: #e5e5e5;
+  --color-fg: #1b1b1b;
+  --color-fg-muted: #5d5d5d;
+  --color-accent: #0067c0;
+  --color-accent-fg: #ffffff;
+  --color-danger: #c42b1c;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.10);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.14);
+
+  --font-ui: "Segoe UI Variable", "Segoe UI", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+
+  --motion-duration: 200ms;
+  --motion-easing: cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+[data-scheme="dark"] {
+  --color-bg: #000000;
+  --color-surface: #1c1c1e;
+  --color-border: #38383a;
+  --color-fg: #f5f5f7;
+  --color-fg-muted: #98989d;
+  --color-accent: #0a84ff;
+  --color-accent-fg: #ffffff;
+  --color-danger: #ff453a;
+}
+
+[data-platform="windows"][data-scheme="dark"] {
+  --color-bg: #202020;
+  --color-surface: #2b2b2b;
+  --color-border: #3d3d3d;
+  --color-fg: #ffffff;
+  --color-fg-muted: #c5c5c5;
+  --color-accent: #4cc2ff;
+  --color-accent-fg: #003a5c;
+  --color-danger: #ff99a4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) {
+    --color-bg: #000000;
+    --color-surface: #1c1c1e;
+    --color-border: #38383a;
+    --color-fg: #f5f5f7;
+    --color-fg-muted: #98989d;
+    --color-accent: #0a84ff;
+    --color-accent-fg: #ffffff;
+    --color-danger: #ff453a;
+  }
+
+  [data-platform="windows"]:not([data-scheme="light"]) {
+    --color-bg: #202020;
+    --color-surface: #2b2b2b;
+    --color-border: #3d3d3d;
+    --color-fg: #ffffff;
+    --color-fg-muted: #c5c5c5;
+    --color-accent: #4cc2ff;
+    --color-accent-fg: #003a5c;
+    --color-danger: #ff99a4;
+  }
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-ui);
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Markdown プレビューの最小限のタイポグラフィ */
+.markdown-preview h1 { font-size: 1.5rem; font-weight: 700; margin: 0.6em 0 0.4em; }
+.markdown-preview h2 { font-size: 1.25rem; font-weight: 700; margin: 0.6em 0 0.4em; }
+.markdown-preview h3 { font-size: 1.05rem; font-weight: 600; margin: 0.6em 0 0.4em; }
+.markdown-preview p { margin: 0.5em 0; line-height: 1.7; }
+.markdown-preview ul,
+.markdown-preview ol { margin: 0.5em 0; padding-left: 1.4em; list-style: revert; }
+.markdown-preview li { margin: 0.2em 0; }
+.markdown-preview code {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0 0.3em;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+.markdown-preview pre {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  overflow-x: auto;
+}
+.markdown-preview pre code { border: none; padding: 0; }
+.markdown-preview table { border-collapse: collapse; margin: 0.6em 0; display: block; overflow-x: auto; }
+.markdown-preview th,
+.markdown-preview td { border: 1px solid var(--color-border); padding: 6px 10px; }
+.markdown-preview th { background: var(--color-bg); font-weight: 600; }
+.markdown-preview blockquote {
+  border-left: 3px solid var(--color-border);
+  margin: 0.6em 0;
+  padding-left: 12px;
+  color: var(--color-fg-muted);
+}
+.markdown-preview hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
