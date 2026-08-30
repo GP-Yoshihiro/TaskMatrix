@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { FileList } from '@/components/app/file-list'
 import { FileUploadForm } from '@/components/app/file-upload-form'
 import { FolderTree } from '@/components/app/folder-tree'
+import { MarkdownCreateForm } from '@/components/app/markdown-create-form'
 import { buildFolderTree } from '@/lib/domain/folders'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createSupabaseFolderRepository } from '@/lib/repositories/folders'
@@ -34,6 +35,7 @@ export default async function ProjectDetailPage({
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>
         <h2 style={{ fontWeight: 600 }}>ファイル</h2>
+        <MarkdownCreateForm projectId={projectId} />
         <FileUploadForm projectId={projectId} folderId={null} />
         <FileList projectId={projectId} files={files} />
       </section>
