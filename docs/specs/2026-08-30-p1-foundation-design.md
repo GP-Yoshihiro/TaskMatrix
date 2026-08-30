@@ -177,7 +177,10 @@ file_versions
 ### 6.4 ファイル実体（Supabase Storage）
 
 - バケット `project-files`（private）
-- パス: `{project_id}/{file_id}/{version}/{filename}`
+- パス: `{project_id}/{file_id}/{version}/{file_id}.{拡張子}`
+  - Supabase Storage は非 ASCII のオブジェクトキーを `InvalidKey` で拒否するため、
+    日本語ファイル名をキーに使えない。表示名は `files.name` に保持し、
+    ダウンロード時に署名付きURLの `download` パラメータで復元する
 - 配信は署名付き URL のみ。公開 URL は発行しない
 - 対応形式: `.xlsx` `.docx` `.pptx` `.pdf` `.txt` `.md`
 - サイズ上限: 25 MB（`lib/domain` の定数として一元管理）
