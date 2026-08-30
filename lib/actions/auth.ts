@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { validateCredentials } from '@/lib/domain/auth'
+import { describeAuthFailure, validateCredentials } from '@/lib/domain/auth'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
@@ -16,10 +16,14 @@ export async function signUpAction(formData: FormData): Promise<Result<null>> {
   const { error } = await supabase.auth.signUp(validated.data)
 
   if (error) {
-    return err(
-      'VALIDATION_ERROR',
-      'アカウントを作成できませんでした。入力内容をご確認ください。',
-    )
+    if (error.code === 'user_already_exists' || error.status === 422) {
+      return err(
+        'VALIDATION_ERROR',
+        'このメールアドレスは既に登録されています。ログイン画面からお進みください。',
+      )
+    }
+    const described = describeAuthFailure(error)
+    return { ok: false, error: described }
   }
 
   return ok(null)
@@ -36,7 +40,7 @@ export async function signInAction(formData: FormData): Promise<Result<null>> {
   const { error } = await supabase.auth.signInWithPassword(validated.data)
 
   if (error) {
-    return err('UNAUTHENTICATED', 'メールアドレスまたはパスワードが正しくありません。')
+    return { ok: false, error: describeAuthFailure(error) }
   }
 
   return ok(null)

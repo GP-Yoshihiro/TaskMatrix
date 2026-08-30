@@ -1,11 +1,14 @@
 'use client'
 
-import type { ButtonHTMLAttributes, CSSProperties } from 'react'
+import type { ButtonHTMLAttributes, CSSProperties, Ref } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'danger'
+type Size = 'sm' | 'md'
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant
+  size?: Size
+  ref?: Ref<HTMLButtonElement>
 }
 
 const VARIANT_STYLE: Record<Variant, CSSProperties> = {
@@ -26,17 +29,28 @@ const VARIANT_STYLE: Record<Variant, CSSProperties> = {
   },
 }
 
+const SIZE_STYLE: Record<Size, CSSProperties> = {
+  sm: {
+    padding: 'calc(var(--space-unit) * 1) calc(var(--space-unit) * 2)',
+    fontSize: '0.78rem',
+    borderRadius: 'var(--radius-sm)',
+  },
+  md: {
+    padding: 'calc(var(--space-unit) * 2.5) calc(var(--space-unit) * 4)',
+    fontSize: '0.95rem',
+    borderRadius: 'var(--radius-md)',
+  },
+}
+
 /** すべての見た目をデザイントークン経由で決めるボタン */
-export function Button({ variant = 'primary', style, ...props }: Props) {
+export function Button({ variant = 'primary', size = 'md', style, ...props }: Props) {
   return (
     <button
       {...props}
       style={{
         ...VARIANT_STYLE[variant],
-        borderRadius: 'var(--radius-md)',
-        padding: 'calc(var(--space-unit) * 2.5) calc(var(--space-unit) * 4)',
+        ...SIZE_STYLE[size],
         fontFamily: 'var(--font-ui)',
-        fontSize: '0.95rem',
         cursor: props.disabled ? 'not-allowed' : 'pointer',
         opacity: props.disabled ? 0.5 : 1,
         transition: 'all var(--motion-duration) var(--motion-easing)',

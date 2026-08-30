@@ -1,8 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
-import { signOutAction } from '@/lib/actions/auth'
+import { LogoutButton } from '@/components/app/logout-button'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -33,11 +32,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <Link href="/projects">プロジェクト</Link>
           <Link href="/settings">設定</Link>
         </nav>
-        <form action={signOutAction}>
-          <Button type="submit" variant="secondary">
-            ログアウト
-          </Button>
-        </form>
+        <LogoutButton />
       </header>
       <main style={{ padding: 'calc(var(--space-unit) * 6)' }}>{children}</main>
     </div>

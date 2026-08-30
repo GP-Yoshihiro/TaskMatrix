@@ -1,9 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { MarkdownEditor } from '@/components/app/markdown-editor'
+import { TaskExtractPanel } from '@/components/app/task-extract-panel'
 import { createSupabaseFileVersionRepository } from '@/lib/repositories/file-versions'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+
+/** AI 抽出は 20 秒以上かかることがあるため、実行時間の上限を延ばす */
+export const maxDuration = 120
 
 export default async function FilePage({
   params,
@@ -28,6 +32,13 @@ export default async function FilePage({
         <Link href={`/projects/${projectId}/files/${fileId}/history`}>変更履歴</Link>
         <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
       </header>
+
+      <TaskExtractPanel
+        projectId={projectId}
+        fileId={fileId}
+        fileName={file.name}
+        sourceVersion={file.currentVersion}
+      />
 
       {file.kind === 'binary' ? (
         <p style={{ color: 'var(--color-fg-muted)' }}>
