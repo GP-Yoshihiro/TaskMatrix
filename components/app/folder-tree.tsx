@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { createFolderAction, deleteFolderAction } from '@/lib/actions/folders'
 import type { FolderNode } from '@/lib/domain/folders'
@@ -16,29 +17,16 @@ function FolderItem({
   projectId,
   depth,
   onChanged,
+  onRequestDelete,
+  isPending,
 }: {
   node: FolderNode
   projectId: string
   depth: number
   onChanged: () => void
+  onRequestDelete: (node: FolderNode) => void
+  isPending: boolean
 }) {
-  const [isPending, startTransition] = useTransition()
-
-  function handleDelete() {
-    const confirmed = window.confirm(
-      `フォルダ「${node.name}」と配下の内容をすべて削除します。よろしいですか？`,
-    )
-    if (!confirmed) return
-
-    const formData = new FormData()
-    formData.set('projectId', projectId)
-    formData.set('id', node.id)
-    startTransition(async () => {
-      await deleteFolderAction(formData)
-      onChanged()
-    })
-  }
-
   return (
     <li>
       <div
@@ -50,7 +38,14 @@ function FolderItem({
         }}
       >
         <span>📁 {node.name}</span>
-        <Button variant="secondary" disabled={isPending} onClick={handleDelete}>
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={isPending}
+          aria-label={`フォルダ「${node.name}」を削除`}
+          onClick={() => onRequestDelete(node)}
+          style={{ color: 'var(--color-danger)' }}
+        >
           削除
         </Button>
       </div>
@@ -63,6 +58,8 @@ function FolderItem({
               projectId={projectId}
               depth={depth + 1}
               onChanged={onChanged}
+              onRequestDelete={onRequestDelete}
+              isPending={isPending}
             />
           ))}
         </ul>
@@ -79,10 +76,23 @@ export function FolderTree({
   tree: FolderNode[]
 }) {
   const [message, setMessage] = useState<string | null>(null)
+  const [target, setTarget] = useState<FolderNode | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   const options = tree.flatMap(flatten)
+
+  function handleConfirmDelete() {
+    if (!target) return
+    const formData = new FormData()
+    formData.set('projectId', projectId)
+    formData.set('id', target.id)
+    startTransition(async () => {
+      await deleteFolderAction(formData)
+      setTarget(null)
+      router.refresh()
+    })
+  }
 
   function handleCreate(formData: FormData) {
     setMessage(null)
@@ -138,10 +148,23 @@ export function FolderTree({
               projectId={projectId}
               depth={0}
               onChanged={() => router.refresh()}
+              onRequestDelete={setTarget}
+              isPending={isPending}
             />
           ))}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={target !== null}
+        title="本当に削除しますか？"
+        description={`フォルダ「${target?.name ?? ''}」を削除します。配下のフォルダとファイルもすべて削除されます。`}
+        warning="一度削除すると復元はできません。"
+        confirmLabel="削除する"
+        pending={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setTarget(null)}
+      />
     </section>
   )
 }
