@@ -53,13 +53,13 @@ Supabase（Auth / PostgreSQL / Storage）を `@supabase/ssr` の Cookie セッ�
 | `lib/platform/theme.ts` | UA からのプラットフォーム判定・テーマ解決 |
 | `lib/supabase/server.ts` | Server Component / Server Action 用クライアント生成 |
 | `lib/supabase/client.ts` | ブラウザ用クライアント生成 |
-| `lib/supabase/middleware.ts` | セッション更新用ヘルパ |
+| `lib/supabase/proxy.ts` | セッション更新用ヘルパ |
 | `lib/repositories/*.ts` | データアクセス（インターフェース＋Supabase 実装） |
 | `lib/actions/*.ts` | Server Actions（薄く保ち、判断は domain に置く） |
 | `components/ui/*.tsx` | トークン駆動プリミティブ（1 セットのみ） |
 | `components/app/*.tsx` | 画面固有コンポーネント |
 | `app/globals.css` | デザイントークン（apple / windows × light / dark） |
-| `middleware.ts` | 認証セッション更新とルート保護 |
+| `proxy.ts` | 認証セッション更新とルート保護（Next.js 16 で middleware から改称） |
 
 `lib/domain` は外部依存を持たない。データアクセスもフレームワーク API も参照しない。
 
@@ -1071,8 +1071,8 @@ git commit -m "feat(theme): プラットフォーム適応デザイントーク�
 **ブランチ:** `feature/auth`
 
 **Files:**
-- Create: `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/supabase/middleware.ts`
-- Create: `middleware.ts`
+- Create: `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/supabase/proxy.ts`
+- Create: `proxy.ts`
 - Create: `lib/actions/auth.ts`
 - Create: `app/(auth)/login/page.tsx`, `app/(auth)/signup/page.tsx`
 - Create: `components/app/auth-form.tsx`
@@ -1247,7 +1247,7 @@ export async function createServerSupabaseClient() {
 }
 ```
 
-`lib/supabase/middleware.ts`:
+`lib/supabase/proxy.ts`:
 
 ```typescript
 import { createServerClient } from '@supabase/ssr'
@@ -1298,13 +1298,13 @@ export async function updateSession(request: NextRequest) {
 }
 ```
 
-`middleware.ts`（プロジェクト直下）:
+`proxy.ts`（プロジェクト直下。Next.js 16 で `middleware.ts` から改称された）:
 
 ```typescript
 import type { NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { updateSession } from '@/lib/supabase/proxy'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return updateSession(request)
 }
 
@@ -1562,7 +1562,7 @@ git add -A
 git commit -m "feat(auth): メールとパスワードによる認証を実装
 
 - @supabase/ssr による Cookie セッション管理を追加
-- middleware で保護ルートを未認証時にログイン画面へ転送
+- proxy で保護ルートを未認証時にログイン画面へ転送
 - サインアップ/ログイン/ログアウトの Server Action を実装
 - 認証情報の検証ロジックとテストを追加"
 ```
