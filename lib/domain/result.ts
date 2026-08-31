@@ -14,6 +14,8 @@ export type AppErrorCode =
   | 'AI_REQUEST_FAILED'
   | 'AI_MODEL_UNAVAILABLE'
   | 'AI_RESPONSE_INVALID'
+  | 'NO_SCHEDULABLE_TASKS'
+  | 'INVALID_SCHEDULE_RANGE'
   | 'UNKNOWN'
 
 export type AppError = {
