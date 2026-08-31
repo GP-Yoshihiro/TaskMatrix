@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies, headers } from 'next/headers'
 import type { ReactNode } from 'react'
+import { ServiceWorkerRegister } from '@/components/app/service-worker-register'
 import {
   THEME_COOKIE_NAME,
   type ThemePreference,
@@ -51,7 +52,10 @@ export default async function RootLayout({
 
   return (
     <html lang="ja" data-platform={platform}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorkerRegister />
+      </body>
     </html>
   )
 }
