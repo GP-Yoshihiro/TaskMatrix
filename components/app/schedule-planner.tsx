@@ -209,6 +209,22 @@ export function SchedulePlanner({
         </p>
       )}
 
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        {confirmed.length > 0 ? (
+          <a
+            href={`/api/projects/${projectId}/schedule.ics`}
+            download="taskmatrix.ics"
+            style={{ fontSize: '0.85rem' }}
+          >
+            .ics を書き出す（確定済み {confirmed.length} 件）
+          </a>
+        ) : (
+          <span style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
+            確定した予定がありません。書き出しは確定後にご利用いただけます。
+          </span>
+        )}
+      </div>
+
       <CalendarMonth entries={calendarEntries} settings={settings} />
 
       {drafts && drafts.length > 0 && (
