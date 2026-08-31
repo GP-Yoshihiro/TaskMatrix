@@ -2,28 +2,28 @@ import { GoogleGenAI } from '@google/genai'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { TimeoutError, withTimeout } from './with-timeout'
 import {
-  EXTRACTION_SCHEMA,
-  type ExtractedTask,
-  buildPrompt,
-  parseExtractionResponse,
-} from './extract-tasks'
+  SCHEDULE_SCHEMA,
+  type RawSchedule,
+  type SchedulePromptInput,
+  buildSchedulePrompt,
+  parseScheduleResponse,
+} from './plan-schedule'
 
-export type ExtractionResult = {
-  tasks: ExtractedTask[]
-  document_summary: string
+export type PlanResult = {
+  schedules: RawSchedule[]
+  overall_note: string
   model: string
   inputTokens: number
   outputTokens: number
 }
 
-export interface TaskExtractor {
-  extract(input: { text: string } | { pdf: Uint8Array }): Promise<Result<ExtractionResult>>
+export interface SchedulePlanner {
+  plan(input: SchedulePromptInput): Promise<Result<PlanResult>>
 }
 
 const DEFAULT_MODEL = 'gemini-3.7-flash'
 const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash'
 
-/** 混雑・レート制限は別モデルで再試行する価値がある */
 /**
  * 応答が返らないまま固まるのを防ぐ。
  * 実測では 20〜31 秒で完了するため、その 3 倍程度を上限とする。
@@ -39,37 +39,24 @@ function isRetryable(error: unknown): boolean {
 }
 
 /**
- * Gemini によるタスク抽出。
- *
- * 2026-08-30 の検証で既定モデルが 500「currently experiencing high demand」を
- * 継続的に返したため、5xx / 429 のときはフォールバックモデルへ切り替える。
+ * Gemini によるスケジュール算出。
+ * P2 の抽出と同じく、既定モデルが 5xx を返したらフォールバックへ切り替える。
  */
-export function createGeminiTaskExtractor(): TaskExtractor {
+export function createGeminiSchedulePlanner(): SchedulePlanner {
   return {
-    async extract(input) {
+    async plan(input) {
       const apiKey = process.env.GEMINI_API_KEY
       if (!apiKey) {
         return err('AI_NOT_CONFIGURED', 'AI 機能が設定されていません。')
       }
 
       const ai = new GoogleGenAI({ apiKey })
-
       const models = [
         process.env.GEMINI_MODEL || DEFAULT_MODEL,
         process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
       ].filter((model, index, all) => all.indexOf(model) === index)
 
-      const contents =
-        'pdf' in input
-          ? [
-              { type: 'text', text: buildPrompt('（添付の PDF を読んでください）') },
-              {
-                type: 'document',
-                data: Buffer.from(input.pdf).toString('base64'),
-                mime_type: 'application/pdf',
-              },
-            ]
-          : [{ type: 'text', text: buildPrompt(input.text) }]
+      const contents = [{ type: 'text', text: buildSchedulePrompt(input) }]
 
       for (const model of models) {
         try {
@@ -80,14 +67,14 @@ export function createGeminiTaskExtractor(): TaskExtractor {
             response_format: {
               type: 'text',
               mime_type: 'application/json',
-              schema: EXTRACTION_SCHEMA,
+              schema: SCHEDULE_SCHEMA,
             },
             } as Parameters<typeof ai.interactions.create>[0]),
             REQUEST_TIMEOUT_MS,
           )
 
           const outputText = (interaction as { output_text?: string }).output_text ?? ''
-          const parsed = parseExtractionResponse(outputText)
+          const parsed = parseScheduleResponse(outputText)
           if (!parsed.ok) return parsed
 
           const usage = (interaction as {
@@ -107,7 +94,6 @@ export function createGeminiTaskExtractor(): TaskExtractor {
               'AI への問い合わせに失敗しました。時間をおいてお試しください。',
             )
           }
-          // 混雑していたら次のモデルを試す
         }
       }
 
