@@ -6,6 +6,7 @@ import {
   type OverlapPair,
   OverlapWarningDialog,
 } from '@/components/app/overlap-warning-dialog'
+import { type CalendarEntry, CalendarMonth } from '@/components/app/calendar-month'
 import { type Conflict, ScheduleDraftItem } from '@/components/app/schedule-draft-item'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -93,6 +94,15 @@ export function SchedulePlanner({
   const totalOverlapCount = (drafts ?? []).filter(
     (draft) => conflictsFor(draft).length > 0,
   ).length
+
+  /** カレンダーに出す予定。仮案は編集に追従して動く */
+  const calendarEntries: CalendarEntry[] = comparables.map((item) => ({
+    id: item.id,
+    label: item.label,
+    startsAt: item.startsAt,
+    endsAt: item.endsAt,
+    draft: item.kind === 'draft',
+  }))
 
   function handlePlan() {
     const agreed = window.confirm(
@@ -198,6 +208,8 @@ export function SchedulePlanner({
           予定を立てるタスクがありません。先にタスクを作成してください。
         </p>
       )}
+
+      <CalendarMonth entries={calendarEntries} settings={settings} />
 
       {drafts && drafts.length > 0 && (
         <Card style={{ display: 'grid', gap: 12 }}>
