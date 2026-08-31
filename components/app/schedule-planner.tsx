@@ -1,11 +1,17 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
+import {
+  type OverlapPair,
+  OverlapWarningDialog,
+} from '@/components/app/overlap-warning-dialog'
+import { type Conflict, ScheduleDraftItem } from '@/components/app/schedule-draft-item'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { planScheduleAction } from '@/lib/actions/schedules'
+import { confirmSchedulesAction, planScheduleAction } from '@/lib/actions/schedules'
 import { callAction } from '@/lib/client/safe-action'
-import { WEIGHT_LABEL, WEIGHT_OVERLAP_HINT, findOverlaps } from '@/lib/domain/schedule'
+import { type WorkSettings, findOverlaps } from '@/lib/domain/schedule'
 import type { Schedule } from '@/lib/repositories/schedules'
 import type { ScheduleDraft } from '@/lib/usecases/plan-schedule'
 
@@ -18,34 +24,29 @@ type Comparable = {
   kind: 'draft' | 'confirmed'
 }
 
-function formatRange(startsAt: string, endsAt: string): string {
-  const start = new Date(startsAt)
-  const end = new Date(endsAt)
-  const date = start.toLocaleDateString('ja-JP', {
-    month: 'numeric',
-    day: 'numeric',
-    weekday: 'short',
-  })
-  const time = (value: Date) =>
-    value.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
-  return `${date} ${time(start)} 〜 ${time(end)}`
-}
-
 export function SchedulePlanner({
   projectId,
   confirmed,
   pendingTaskCount,
+  settings,
 }: {
   projectId: string
   confirmed: Schedule[]
   pendingTaskCount: number
+  settings: WorkSettings
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [warningOpen, setWarningOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
-  /** 仮案と確定済みを合わせた比較対象。編集のたびに作り直す */
+  /**
+   * 仮案と確定済みを合わせた比較対象。
+   * 日時を編集するたびに作り直すため useMemo の依存に drafts を入れる。
+   */
   const comparables = useMemo<Comparable[]>(() => {
     const fromDrafts = (drafts ?? []).map((draft) => ({
       id: draft.key,
@@ -64,7 +65,7 @@ export function SchedulePlanner({
     return [...fromDrafts, ...fromConfirmed]
   }, [drafts, confirmed])
 
-  function overlapsFor(draft: ScheduleDraft): Comparable[] {
+  function conflictsFor(draft: ScheduleDraft): Conflict[] {
     return findOverlaps(
       {
         id: draft.key,
@@ -74,20 +75,37 @@ export function SchedulePlanner({
         kind: 'draft' as const,
       },
       comparables,
-    )
+    ).map((item) => ({ id: item.id, label: item.label, kind: item.kind }))
   }
 
+  const selectedDrafts = (drafts ?? []).filter((draft) => selected.has(draft.key))
+
+  /** 確定対象に含まれる仮案の重複だけを集める */
+  const overlapPairs: OverlapPair[] = selectedDrafts.flatMap((draft) =>
+    conflictsFor(draft).map((conflict) => ({
+      draftKey: draft.key,
+      draftLabel: draft.taskTitle,
+      withLabel: conflict.label,
+      kind: conflict.kind,
+    })),
+  )
+
+  const totalOverlapCount = (drafts ?? []).filter(
+    (draft) => conflictsFor(draft).length > 0,
+  ).length
+
   function handlePlan() {
-    const confirmedOk = window.confirm(
+    const agreed = window.confirm(
       '未完了タスクの一覧（タスク名・説明・優先度・期限）と稼働条件、\n' +
         '確定済みの予定を Google Gemini API に送信してスケジュールを算出します。\n' +
         'ファイルの本文やプロジェクト名は送信しません。\n\n' +
         '実行してよろしいですか？',
     )
-    if (!confirmedOk) return
+    if (!agreed) return
 
     setMessage(null)
     setDrafts(null)
+    setSelected(new Set())
 
     const formData = new FormData()
     formData.set('projectId', projectId)
@@ -97,6 +115,7 @@ export function SchedulePlanner({
       if (result.ok) {
         setDrafts(result.data.drafts)
         setNote(result.data.note)
+        setSelected(new Set(result.data.drafts.map((draft) => draft.key)))
         if (result.data.drafts.length === 0) {
           setMessage('割り当てられる予定がありませんでした。')
         }
@@ -106,14 +125,61 @@ export function SchedulePlanner({
     })
   }
 
-  const overlapCount = (drafts ?? []).filter((draft) => overlapsFor(draft).length > 0).length
+  function updateRange(key: string, startsAt: string, endsAt: string) {
+    setDrafts((previous) =>
+      (previous ?? []).map((draft) =>
+        draft.key === key ? { ...draft, startsAt, endsAt } : draft,
+      ),
+    )
+  }
+
+  function toggle(key: string) {
+    setSelected((previous) => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function save() {
+    const formData = new FormData()
+    formData.set('projectId', projectId)
+    formData.set('drafts', JSON.stringify(selectedDrafts))
+
+    startTransition(async () => {
+      const result = await callAction(() => confirmSchedulesAction(formData))
+      setWarningOpen(false)
+      if (result.ok) {
+        setMessage(`${result.data} 件の予定を確定しました。`)
+        setDrafts(null)
+        setSelected(new Set())
+        router.refresh()
+      } else {
+        setMessage(result.error.message)
+      }
+    })
+  }
+
+  function handleConfirm() {
+    setMessage(null)
+    if (selectedDrafts.length === 0) {
+      setMessage('確定する予定を選んでください。')
+      return
+    }
+    if (overlapPairs.length > 0) {
+      setWarningOpen(true)
+      return
+    }
+    save()
+  }
 
   return (
     <section style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ fontWeight: 600 }}>スケジュール算出</h2>
         <Button onClick={handlePlan} disabled={isPending || pendingTaskCount === 0}>
-          {isPending ? '算出中…（最大 2 分）' : 'スケジュールを算出'}
+          {isPending ? '処理中…（最大 2 分）' : 'スケジュールを算出'}
         </Button>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>
           未完了タスク {pendingTaskCount} 件 / 確定済みの予定 {confirmed.length} 件
@@ -139,63 +205,43 @@ export function SchedulePlanner({
             <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>{note}</p>
           )}
 
-          {overlapCount > 0 && (
+          {totalOverlapCount > 0 && (
             <p style={{ fontSize: '0.85rem', color: 'var(--color-danger)' }}>
-              ⚠️ {overlapCount} 件の予定が他の予定と重複しています。
+              ⚠️ {totalOverlapCount} 件の予定が他の予定と重複しています。
+              日時を編集して調整できます。
             </p>
           )}
 
           <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 10 }}>
-            {drafts.map((draft) => {
-              const conflicts = overlapsFor(draft)
-              return (
-                <li
-                  key={draft.key}
-                  style={{
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: 12,
-                    display: 'grid',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 600 }}>{draft.taskTitle}</span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>
-                      {formatRange(draft.startsAt, draft.endsAt)}
-                    </span>
-                    <span style={{ fontSize: '0.76rem', color: 'var(--color-fg-muted)' }}>
-                      重さ: {WEIGHT_LABEL[draft.weight]}
-                    </span>
-                  </div>
-
-                  <p style={{ fontSize: '0.82rem' }}>{draft.reason}</p>
-
-                  <p style={{ fontSize: '0.76rem', color: 'var(--color-fg-muted)' }}>
-                    {WEIGHT_OVERLAP_HINT[draft.weight]}
-                  </p>
-
-                  {draft.outOfWorkHours && (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--color-danger)' }}>
-                      ⚠️ 稼働時間外です。
-                    </p>
-                  )}
-
-                  {conflicts.map((conflict) => (
-                    <p
-                      key={conflict.id}
-                      style={{ fontSize: '0.8rem', color: 'var(--color-danger)' }}
-                    >
-                      ⚠️ {conflict.kind === 'confirmed' ? '確定済み' : '仮案'}の「
-                      {conflict.label}」と重複しています。
-                    </p>
-                  ))}
-                </li>
-              )
-            })}
+            {drafts.map((draft) => (
+              <ScheduleDraftItem
+                key={draft.key}
+                draft={draft}
+                timezone={settings.timezone}
+                selected={selected.has(draft.key)}
+                conflicts={conflictsFor(draft)}
+                disabled={isPending}
+                onToggle={() => toggle(draft.key)}
+                onChangeRange={(startsAt, endsAt) => updateRange(draft.key, startsAt, endsAt)}
+              />
+            ))}
           </ul>
+
+          <div>
+            <Button onClick={handleConfirm} disabled={isPending}>
+              選択した予定を確定（{selected.size} 件）
+            </Button>
+          </div>
         </Card>
       )}
+
+      <OverlapWarningDialog
+        open={warningOpen}
+        pairs={overlapPairs}
+        pending={isPending}
+        onConfirm={save}
+        onCancel={() => setWarningOpen(false)}
+      />
     </section>
   )
 }

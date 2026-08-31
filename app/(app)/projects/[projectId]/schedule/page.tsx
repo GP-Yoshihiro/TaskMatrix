@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { SchedulePlanner } from '@/components/app/schedule-planner'
+import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
+import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /** AI の算出は 20 秒以上かかることがあるため、実行時間の上限を延ばす */
@@ -24,10 +26,17 @@ export default async function SchedulePage({
 
   if (!project) notFound()
 
-  const [tasks, confirmed] = await Promise.all([
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const [tasks, confirmed, savedSettings] = await Promise.all([
     createSupabaseTaskRepository(supabase).listByProject(projectId),
     createSupabaseScheduleRepository(supabase).listByProject(projectId),
+    user ? createSupabaseWorkSettingsRepository(supabase).find(user.id) : null,
   ])
+
+  const settings = savedSettings ?? DEFAULT_WORK_SETTINGS
 
   const pendingTaskCount = tasks.filter((task) => task.status !== 'done').length
 
@@ -42,6 +51,7 @@ export default async function SchedulePage({
         projectId={projectId}
         confirmed={confirmed}
         pendingTaskCount={pendingTaskCount}
+        settings={settings}
       />
     </div>
   )

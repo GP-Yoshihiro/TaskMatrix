@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { type Result, err, ok } from '@/lib/domain/result'
+import { TimeoutError, withTimeout } from './with-timeout'
 import {
   SCHEDULE_SCHEMA,
   type RawSchedule,
@@ -23,7 +24,16 @@ export interface SchedulePlanner {
 const DEFAULT_MODEL = 'gemini-3.7-flash'
 const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash'
 
+/**
+ * 応答が返らないまま固まるのを防ぐ。
+ * 実測では 20〜31 秒で完了するため、その 3 倍程度を上限とする。
+ * Server Action の maxDuration (120 秒) より短くし、
+ * 打ち切られる前に日本語のエラーを返せるようにする。
+ */
+const REQUEST_TIMEOUT_MS = 90_000
+
 function isRetryable(error: unknown): boolean {
+  if (error instanceof TimeoutError) return true
   const status = (error as { status?: number })?.status
   return status === 429 || status === 500 || status === 502 || status === 503
 }
@@ -50,7 +60,8 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
 
       for (const model of models) {
         try {
-          const interaction = await ai.interactions.create({
+          const interaction = await withTimeout(
+            ai.interactions.create({
             model,
             input: contents,
             response_format: {
@@ -58,7 +69,9 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
               mime_type: 'application/json',
               schema: SCHEDULE_SCHEMA,
             },
-          } as Parameters<typeof ai.interactions.create>[0])
+            } as Parameters<typeof ai.interactions.create>[0]),
+            REQUEST_TIMEOUT_MS,
+          )
 
           const outputText = (interaction as { output_text?: string }).output_text ?? ''
           const parsed = parseScheduleResponse(outputText)
