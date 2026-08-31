@@ -36,6 +36,7 @@ export default async function ProjectDetailPage({
         <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name}</h1>
         <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
         <Link href={`/projects/${projectId}/schedule`}>スケジュールへ</Link>
+        <Link href={`/projects/${projectId}/chat`}>AI チャットへ</Link>
       </header>
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>

@@ -27,6 +27,7 @@ export default async function TasksPage({
       <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name} のタスク</h1>
         <Link href={`/projects/${projectId}/schedule`}>スケジュールへ</Link>
+        <Link href={`/projects/${projectId}/chat`}>AI チャットへ</Link>
         <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
       </header>
       <TaskManager projectId={projectId} tasks={tasks} />
