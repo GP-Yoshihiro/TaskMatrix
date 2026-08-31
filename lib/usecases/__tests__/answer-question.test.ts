@@ -48,11 +48,26 @@ function makeDeps(overrides: { matches?: MatchedChunk[]; history?: ChatMessage[]
   }
 
   const embedder: Embedder = {
-    embed: vi.fn(async () => ok([Array.from({ length: 768 }, () => 0.1)])),
+    embed: vi.fn(async () =>
+      ok({
+        vectors: [Array.from({ length: 768 }, () => 0.1)],
+        usage: { model: 'gemini-embedding-2', inputTokens: 0, outputTokens: 0, inputChars: 12 },
+      }),
+    ),
   }
 
   const answerer: QuestionAnswerer = {
-    answer: vi.fn(async () => ok('要件メモ.md によると、来週までに提出します。')),
+    answer: vi.fn(async () =>
+      ok({
+        text: '要件メモ.md によると、来週までに提出します。',
+        usage: {
+          model: 'gemini-3.5-flash',
+          inputTokens: 900,
+          outputTokens: 120,
+          inputChars: 3000,
+        },
+      }),
+    ),
   }
 
   return { chunks, files, chat, embedder, answerer }

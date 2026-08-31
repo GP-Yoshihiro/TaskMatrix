@@ -5,6 +5,7 @@ import {
 } from '@/lib/domain/extraction'
 import { getExtension } from '@/lib/domain/files'
 import { type AppError, type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
 import { type TaskPriority, isTaskPriority, normalizeDueDate } from '@/lib/domain/tasks'
 import type { TextExtractor } from '@/lib/extraction/text'
 import type { TaskExtractor } from '@/lib/gemini/client'
@@ -40,7 +41,7 @@ type Deps = {
 export async function extractTasksFromFile(
   deps: Deps,
   input: { projectId: string; fileId: string; userId: string },
-): Promise<Result<{ suggestions: TaskSuggestion[]; summary: string }>> {
+): Promise<Result<{ suggestions: TaskSuggestion[]; summary: string; usage: AiUsage }>> {
   const file = await deps.files.findById(input.fileId)
   if (!file) return err('NOT_FOUND', 'ファイルが見つかりません。')
 
@@ -102,12 +103,16 @@ export async function extractTasksFromFile(
 
   await deps.runs.finish({
     runId: run.id,
-    model: extracted.data.model,
+    model: extracted.data.usage.model,
     taskCount: suggestions.length,
     inputChars: text.length,
-    inputTokens: extracted.data.inputTokens,
-    outputTokens: extracted.data.outputTokens,
+    inputTokens: extracted.data.usage.inputTokens,
+    outputTokens: extracted.data.usage.outputTokens,
   })
 
-  return ok({ suggestions, summary: extracted.data.document_summary })
+  return ok({
+    suggestions,
+    summary: extracted.data.document_summary,
+    usage: extracted.data.usage,
+  })
 }

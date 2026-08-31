@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { ThemeSwitcher } from '@/components/app/theme-switcher'
 import { WorkSettingsForm } from '@/components/app/work-settings-form'
@@ -37,6 +38,13 @@ export default async function SettingsPage() {
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>表示テーマ</h2>
         <ThemeSwitcher current={current} />
+      </section>
+      <section style={{ display: 'grid', gap: 8 }}>
+        <h2 style={{ fontWeight: 600 }}>AI の使用量</h2>
+        <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+          これまでに使ったトークン量と、処理にかかった時間を確認できます。
+        </p>
+        <Link href="/settings/usage">使用量の履歴を見る</Link>
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>稼働条件</h2>

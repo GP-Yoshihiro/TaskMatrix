@@ -68,7 +68,15 @@ function makeDeps(overrides: { files?: ProjectFile[] } = {}) {
 
   const embedder: Embedder = {
     embed: vi.fn(async (texts: string[]) =>
-      ok(texts.map(() => Array.from({ length: 768 }, () => 0.1))),
+      ok({
+        vectors: texts.map(() => Array.from({ length: 768 }, () => 0.1)),
+        usage: {
+          model: 'gemini-embedding-2',
+          inputTokens: 0,
+          outputTokens: 0,
+          inputChars: texts.reduce((total, text) => total + text.length, 0),
+        },
+      }),
     ),
   }
 

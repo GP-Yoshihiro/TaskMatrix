@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { isTaskWeight } from '@/lib/domain/schedule'
+import type { WithUsage } from '@/lib/domain/usage'
 import { createGeminiSchedulePlanner } from '@/lib/gemini/plan-schedule-client'
+import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
@@ -13,6 +15,7 @@ import {
   type ScheduleDraft,
   planScheduleForProject,
 } from '@/lib/usecases/plan-schedule'
+import { trackUsage } from '@/lib/usecases/track-usage'
 
 /** その日のうちにブラウザ側で使うため、稼働条件のタイムゾーンで今日の日付を作る */
 function todayIn(timezone: string): string {
@@ -27,7 +30,7 @@ function todayIn(timezone: string): string {
 
 export async function planScheduleAction(
   formData: FormData,
-): Promise<Result<PlanScheduleOutput>> {
+): Promise<Result<WithUsage<PlanScheduleOutput>>> {
   const projectId = String(formData.get('projectId') ?? '')
   if (!projectId) return err('VALIDATION_ERROR', 'プロジェクトが指定されていません。')
 
@@ -41,18 +44,23 @@ export async function planScheduleAction(
 
   try {
     const settings = await workSettings.find(user.id)
-    return await planScheduleForProject(
-      {
-        tasks: createSupabaseTaskRepository(supabase),
-        schedules: createSupabaseScheduleRepository(supabase),
-        workSettings,
-        planner: createGeminiSchedulePlanner(),
-      },
-      {
-        projectId,
-        userId: user.id,
-        today: todayIn(settings?.timezone ?? 'Asia/Tokyo'),
-      },
+    return await trackUsage(
+      createSupabaseAiUsageRepository(supabase),
+      { userId: user.id, projectId, operation: 'plan_schedule' },
+      () =>
+        planScheduleForProject(
+          {
+            tasks: createSupabaseTaskRepository(supabase),
+            schedules: createSupabaseScheduleRepository(supabase),
+            workSettings,
+            planner: createGeminiSchedulePlanner(),
+          },
+          {
+            projectId,
+            userId: user.id,
+            today: todayIn(settings?.timezone ?? 'Asia/Tokyo'),
+          },
+        ),
     )
   } catch {
     return err('UNKNOWN', 'スケジュールを算出できませんでした。')

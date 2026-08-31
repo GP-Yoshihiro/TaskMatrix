@@ -65,9 +65,12 @@ function makeDeps(overrides: {
       ok({
         schedules: overrides.proposals ?? [goodProposal],
         overall_note: '優先度順に配置しました。',
-        model: 'gemini-3.5-flash',
-        inputTokens: 100,
-        outputTokens: 200,
+        usage: {
+          model: 'gemini-3.5-flash',
+          inputTokens: 100,
+          outputTokens: 200,
+          inputChars: 0,
+        },
       }),
     ),
   }

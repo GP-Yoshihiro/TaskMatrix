@@ -1,6 +1,7 @@
 import { splitIntoChunks, validateChunkCount } from '@/lib/domain/chunk'
 import { preprocessText } from '@/lib/domain/extraction'
 import { type Result, err, ok } from '@/lib/domain/result'
+import { EMPTY_USAGE, type AiUsage } from '@/lib/domain/usage'
 import type { TextExtractor } from '@/lib/extraction/text'
 import type { Embedder } from '@/lib/gemini/embeddings'
 import type { ChunkInput, FileChunkRepository } from '@/lib/repositories/file-chunks'
@@ -28,7 +29,7 @@ type Deps = {
 export async function buildIndexForProject(
   deps: Deps,
   input: { projectId: string },
-): Promise<Result<{ files: number; chunks: number }>> {
+): Promise<Result<{ files: number; chunks: number; usage: AiUsage }>> {
   const files = await deps.files.listByProject(input.projectId)
 
   // 先に全ファイルの本文を集めてチャンク化する。
@@ -79,15 +80,23 @@ export async function buildIndexForProject(
   }
 
   // 埋め込みは件数を区切って作る
+  let usage: AiUsage = EMPTY_USAGE
+
   for (let start = 0; start < rows.length; start += EMBED_BATCH_SIZE) {
     const batch = rows.slice(start, start + EMBED_BATCH_SIZE)
     const embedded = await deps.embedder.embed(batch.map((row) => row.content))
     if (!embedded.ok) return embedded
 
-    for (const [index, vector] of embedded.data.entries()) {
+    // 複数回に分けても、利用者から見れば 1 回の処理。文字数を積み上げる
+    usage = {
+      ...embedded.data.usage,
+      inputChars: usage.inputChars + embedded.data.usage.inputChars,
+    }
+
+    for (const [index, vector] of embedded.data.vectors.entries()) {
       await deps.chunks.updateEmbedding(batch[index].id, vector)
     }
   }
 
-  return ok({ files: pending.length, chunks: rows.length })
+  return ok({ files: pending.length, chunks: rows.length, usage })
 }

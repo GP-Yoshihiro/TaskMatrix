@@ -2,6 +2,8 @@ import { GoogleGenAI } from '@google/genai'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { PromptExcerpt, PromptMessage } from '@/lib/domain/rag'
 import { buildAnswerPrompt } from '@/lib/domain/rag'
+import type { AiUsage } from '@/lib/domain/usage'
+import { readUsage } from './usage'
 import { TimeoutError, withTimeout } from './with-timeout'
 
 export interface QuestionAnswerer {
@@ -9,7 +11,7 @@ export interface QuestionAnswerer {
     question: string
     excerpts: PromptExcerpt[]
     history: PromptMessage[]
-  }): Promise<Result<string>>
+  }): Promise<Result<{ text: string; usage: AiUsage }>>
 }
 
 const DEFAULT_MODEL = 'gemini-3.7-flash'
@@ -34,7 +36,8 @@ export function createGeminiQuestionAnswerer(): QuestionAnswerer {
         process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
       ].filter((model, index, all) => all.indexOf(model) === index)
 
-      const contents = [{ type: 'text', text: buildAnswerPrompt(input) }]
+      const promptText = buildAnswerPrompt(input)
+      const contents = [{ type: 'text', text: promptText }]
 
       for (const model of models) {
         try {
@@ -50,7 +53,7 @@ export function createGeminiQuestionAnswerer(): QuestionAnswerer {
           if (text.trim().length === 0) {
             return err('AI_RESPONSE_INVALID', 'AI の応答を解釈できませんでした。')
           }
-          return ok(text)
+          return ok({ text, usage: readUsage(interaction, model, promptText.length) })
         } catch (error) {
           if (!isRetryable(error)) {
             return err(
