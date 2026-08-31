@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
+import { readUsage } from './usage'
 import { TimeoutError, withTimeout } from './with-timeout'
 import {
   SCHEDULE_SCHEMA,
@@ -12,9 +14,7 @@ import {
 export type PlanResult = {
   schedules: RawSchedule[]
   overall_note: string
-  model: string
-  inputTokens: number
-  outputTokens: number
+  usage: AiUsage
 }
 
 export interface SchedulePlanner {
@@ -56,7 +56,8 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
         process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
       ].filter((model, index, all) => all.indexOf(model) === index)
 
-      const contents = [{ type: 'text', text: buildSchedulePrompt(input) }]
+      const promptText = buildSchedulePrompt(input)
+      const contents = [{ type: 'text', text: promptText }]
 
       for (const model of models) {
         try {
@@ -77,15 +78,9 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
           const parsed = parseScheduleResponse(outputText)
           if (!parsed.ok) return parsed
 
-          const usage = (interaction as {
-            usage?: { total_input_tokens?: number; total_output_tokens?: number }
-          }).usage
-
           return ok({
             ...parsed.data,
-            model,
-            inputTokens: usage?.total_input_tokens ?? 0,
-            outputTokens: usage?.total_output_tokens ?? 0,
+            usage: readUsage(interaction, model, promptText.length),
           })
         } catch (error) {
           if (!isRetryable(error)) {

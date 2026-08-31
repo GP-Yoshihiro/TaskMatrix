@@ -3,11 +3,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { AiProgress } from '@/components/ui/ai-progress'
+import { AiUsageNote } from '@/components/ui/ai-usage-note'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { extractTasksAction, registerTasksAction } from '@/lib/actions/extraction'
 import { callAction } from '@/lib/client/safe-action'
 import { PRIORITY_LABEL } from '@/lib/domain/tasks'
+import type { AiUsage, Estimate } from '@/lib/domain/usage'
 import type { TaskSuggestion } from '@/lib/usecases/extract-tasks'
 
 export function TaskExtractPanel({
@@ -15,16 +18,23 @@ export function TaskExtractPanel({
   fileId,
   fileName,
   sourceVersion,
+  estimate,
 }: {
   projectId: string
   fileId: string
   fileName: string
   sourceVersion: number
+  estimate: Estimate
 }) {
   const [suggestions, setSuggestions] = useState<TaskSuggestion[] | null>(null)
   const [summary, setSummary] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [message, setMessage] = useState<string | null>(null)
+  // 抽出だけを進捗表示の対象にする。タスク登録は AI を呼ばず一瞬で終わるため
+  const [extracting, setExtracting] = useState(false)
+  const [lastRun, setLastRun] = useState<{ usage: AiUsage; durationMs: number } | null>(
+    null,
+  )
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -38,6 +48,8 @@ export function TaskExtractPanel({
 
     setMessage(null)
     setSuggestions(null)
+    setLastRun(null)
+    setExtracting(true)
 
     const formData = new FormData()
     formData.set('projectId', projectId)
@@ -45,9 +57,12 @@ export function TaskExtractPanel({
 
     startTransition(async () => {
       const result = await callAction(() => extractTasksAction(formData))
+      setExtracting(false)
+
       if (result.ok) {
         setSuggestions(result.data.suggestions)
         setSummary(result.data.summary)
+        setLastRun({ usage: result.data.usage, durationMs: result.data.durationMs })
         setSelected(new Set(result.data.suggestions.map((_, index) => index)))
         if (result.data.suggestions.length === 0) {
           setMessage('タスクは見つかりませんでした。')
@@ -98,7 +113,7 @@ export function TaskExtractPanel({
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ fontWeight: 600 }}>AI タスク抽出</h2>
         <Button onClick={handleExtract} disabled={isPending}>
-          {isPending ? '解析中…（最大 2 分）' : 'タスクを抽出'}
+          {extracting ? '解析中…' : 'タスクを抽出'}
         </Button>
         <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
         {message && <span style={{ fontSize: '0.85rem' }}>{message}</span>}
@@ -108,6 +123,15 @@ export function TaskExtractPanel({
         このファイルの本文が Google Gemini API に送信されます。
         ファイル名・プロジェクト名・アカウント情報は送信しません。
       </p>
+
+      <AiProgress
+        pending={extracting}
+        estimateMs={estimate.ms}
+        isMeasured={estimate.isMeasured}
+      />
+      {lastRun && !extracting && (
+        <AiUsageNote usage={lastRun.usage} durationMs={lastRun.durationMs} />
+      )}
 
       {suggestions && suggestions.length > 0 && (
         <Card style={{ display: 'grid', gap: 12 }}>

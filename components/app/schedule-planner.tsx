@@ -8,11 +8,14 @@ import {
 } from '@/components/app/overlap-warning-dialog'
 import { type CalendarEntry, CalendarMonth } from '@/components/app/calendar-month'
 import { type Conflict, ScheduleDraftItem } from '@/components/app/schedule-draft-item'
+import { AiProgress } from '@/components/ui/ai-progress'
+import { AiUsageNote } from '@/components/ui/ai-usage-note'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { confirmSchedulesAction, planScheduleAction } from '@/lib/actions/schedules'
 import { callAction } from '@/lib/client/safe-action'
 import { type WorkSettings, findOverlaps } from '@/lib/domain/schedule'
+import type { AiUsage, Estimate } from '@/lib/domain/usage'
 import type { Schedule } from '@/lib/repositories/schedules'
 import type { ScheduleDraft } from '@/lib/usecases/plan-schedule'
 
@@ -30,17 +33,24 @@ export function SchedulePlanner({
   confirmed,
   pendingTaskCount,
   settings,
+  estimate,
 }: {
   projectId: string
   confirmed: Schedule[]
   pendingTaskCount: number
   settings: WorkSettings
+  estimate: Estimate
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [warningOpen, setWarningOpen] = useState(false)
+  // 算出だけを進捗表示の対象にする。確定の保存は AI を呼ばず一瞬で終わるため
+  const [planning, setPlanning] = useState(false)
+  const [lastRun, setLastRun] = useState<{ usage: AiUsage; durationMs: number } | null>(
+    null,
+  )
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -116,15 +126,20 @@ export function SchedulePlanner({
     setMessage(null)
     setDrafts(null)
     setSelected(new Set())
+    setLastRun(null)
+    setPlanning(true)
 
     const formData = new FormData()
     formData.set('projectId', projectId)
 
     startTransition(async () => {
       const result = await callAction(() => planScheduleAction(formData))
+      setPlanning(false)
+
       if (result.ok) {
         setDrafts(result.data.drafts)
         setNote(result.data.note)
+        setLastRun({ usage: result.data.usage, durationMs: result.data.durationMs })
         setSelected(new Set(result.data.drafts.map((draft) => draft.key)))
         if (result.data.drafts.length === 0) {
           setMessage('割り当てられる予定がありませんでした。')
@@ -189,7 +204,7 @@ export function SchedulePlanner({
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 style={{ fontWeight: 600 }}>スケジュール算出</h2>
         <Button onClick={handlePlan} disabled={isPending || pendingTaskCount === 0}>
-          {isPending ? '処理中…（最大 2 分）' : 'スケジュールを算出'}
+          {planning ? '処理中…' : 'スケジュールを算出'}
         </Button>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>
           未完了タスク {pendingTaskCount} 件 / 確定済みの予定 {confirmed.length} 件
@@ -202,6 +217,15 @@ export function SchedulePlanner({
         Google Gemini API に送信されます。ファイルの本文・プロジェクト名・
         アカウント情報は送信しません。
       </p>
+
+      <AiProgress
+        pending={planning}
+        estimateMs={estimate.ms}
+        isMeasured={estimate.isMeasured}
+      />
+      {lastRun && !planning && (
+        <AiUsageNote usage={lastRun.usage} durationMs={lastRun.durationMs} />
+      )}
 
       {pendingTaskCount === 0 && (
         <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>

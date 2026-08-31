@@ -1,10 +1,20 @@
 import { GoogleGenAI } from '@google/genai'
 import { EMBEDDING_DIMENSIONS } from '@/lib/domain/chunk'
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
 import { withTimeout } from './with-timeout'
 
+export type EmbedResult = {
+  vectors: number[][]
+  /**
+   * 埋め込み API は使用量を返さない（2026-08-31 の実測では embedding のみ）。
+   * トークン数は推定せず 0 のままとし、規模は inputChars で表す。
+   */
+  usage: AiUsage
+}
+
 export interface Embedder {
-  embed(texts: string[]): Promise<Result<number[][]>>
+  embed(texts: string[]): Promise<Result<EmbedResult>>
 }
 
 const DEFAULT_EMBEDDING_MODEL = 'gemini-embedding-2'
@@ -29,7 +39,12 @@ const countMismatch = () =>
 export function createGeminiEmbedder(): Embedder {
   return {
     async embed(texts) {
-      if (texts.length === 0) return ok([])
+      const inputChars = texts.reduce((total, text) => total + text.length, 0)
+      const model = process.env.GEMINI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL
+
+      const usage: AiUsage = { model, inputTokens: 0, outputTokens: 0, inputChars }
+
+      if (texts.length === 0) return ok({ vectors: [], usage })
 
       const apiKey = process.env.GEMINI_API_KEY
       if (!apiKey) {
@@ -41,7 +56,7 @@ export function createGeminiEmbedder(): Embedder {
       try {
         const response = await withTimeout(
           ai.models.embedContent({
-            model: process.env.GEMINI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL,
+            model,
             contents: texts.map((text) => ({ parts: [{ text }] })),
             config: { outputDimensionality: EMBEDDING_DIMENSIONS },
           }),
@@ -60,7 +75,7 @@ export function createGeminiEmbedder(): Embedder {
           return countMismatch()
         }
 
-        return ok(vectors)
+        return ok({ vectors, usage })
       } catch {
         return err(
           'AI_REQUEST_FAILED',

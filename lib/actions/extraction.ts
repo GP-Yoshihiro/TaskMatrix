@@ -2,21 +2,24 @@
 
 import { revalidatePath } from 'next/cache'
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { WithUsage } from '@/lib/domain/usage'
 import { isTaskPriority } from '@/lib/domain/tasks'
 import { createOfficeParserExtractor } from '@/lib/extraction/text'
 import { createGeminiTaskExtractor } from '@/lib/gemini/client'
+import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseExtractionRunRepository } from '@/lib/repositories/extraction-runs'
 import { createSupabaseFileVersionRepository } from '@/lib/repositories/file-versions'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { type TaskSuggestion, extractTasksFromFile } from '@/lib/usecases/extract-tasks'
+import { trackUsage } from '@/lib/usecases/track-usage'
 
 const BUCKET = 'project-files'
 
 export async function extractTasksAction(
   formData: FormData,
-): Promise<Result<{ suggestions: TaskSuggestion[]; summary: string }>> {
+): Promise<Result<WithUsage<{ suggestions: TaskSuggestion[]; summary: string }>>> {
   const projectId = String(formData.get('projectId') ?? '')
   const fileId = String(formData.get('fileId') ?? '')
   if (!projectId || !fileId) {
@@ -30,20 +33,27 @@ export async function extractTasksAction(
   if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
 
   try {
-    return await extractTasksFromFile(
-      {
-        files: createSupabaseFileRepository(supabase),
-        versions: createSupabaseFileVersionRepository(supabase),
-        downloadBinary: async (storagePath) => {
-          const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
-          if (error || !data) throw error ?? new Error('download failed')
-          return new Uint8Array(await data.arrayBuffer())
-        },
-        textExtractor: createOfficeParserExtractor(),
-        taskExtractor: createGeminiTaskExtractor(),
-        runs: createSupabaseExtractionRunRepository(supabase),
-      },
-      { projectId, fileId, userId: user.id },
+    return await trackUsage(
+      createSupabaseAiUsageRepository(supabase),
+      { userId: user.id, projectId, operation: 'extract_tasks' },
+      () =>
+        extractTasksFromFile(
+          {
+            files: createSupabaseFileRepository(supabase),
+            versions: createSupabaseFileVersionRepository(supabase),
+            downloadBinary: async (storagePath) => {
+              const { data, error } = await supabase.storage
+                .from(BUCKET)
+                .download(storagePath)
+              if (error || !data) throw error ?? new Error('download failed')
+              return new Uint8Array(await data.arrayBuffer())
+            },
+            textExtractor: createOfficeParserExtractor(),
+            taskExtractor: createGeminiTaskExtractor(),
+            runs: createSupabaseExtractionRunRepository(supabase),
+          },
+          { projectId, fileId, userId: user.id },
+        ),
     )
   } catch {
     return err('UNKNOWN', 'タスク抽出に失敗しました。')

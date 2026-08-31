@@ -1,4 +1,5 @@
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
 import {
   DEFAULT_WORK_SETTINGS,
   type TaskWeight,
@@ -38,6 +39,7 @@ export type PlanScheduleOutput = {
   confirmed: Schedule[]
   note: string
   settings: WorkSettings
+  usage: AiUsage
 }
 
 /**
@@ -114,5 +116,6 @@ export async function planScheduleForProject(
     confirmed,
     note: planned.data.overall_note,
     settings,
+    usage: planned.data.usage,
   })
 }

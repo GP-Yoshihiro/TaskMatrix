@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { MarkdownEditor } from '@/components/app/markdown-editor'
 import { TaskExtractPanel } from '@/components/app/task-extract-panel'
+import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseFileVersionRepository } from '@/lib/repositories/file-versions'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { loadEstimate } from '@/lib/usecases/load-estimate'
 
 /** AI 抽出は 20 秒以上かかることがあるため、実行時間の上限を延ばす */
 export const maxDuration = 120
@@ -25,6 +27,11 @@ export default async function FilePage({
     file.currentVersion,
   )
 
+  const estimate = await loadEstimate(
+    createSupabaseAiUsageRepository(supabase),
+    'extract_tasks',
+  )
+
   return (
     <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
       <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -38,6 +45,7 @@ export default async function FilePage({
         fileId={fileId}
         fileName={file.name}
         sourceVersion={file.currentVersion}
+        estimate={estimate}
       />
 
       {file.kind === 'binary' ? (

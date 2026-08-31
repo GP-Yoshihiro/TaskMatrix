@@ -29,7 +29,7 @@ describe('createGeminiEmbedder', () => {
   it('入力が空なら API を呼ばずに空配列を返す', async () => {
     const result = await createGeminiEmbedder().embed([])
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.data).toEqual([])
+    if (result.ok) expect(result.data.vectors).toEqual([])
     expect(embedContent).not.toHaveBeenCalled()
   })
 
@@ -70,8 +70,8 @@ describe('createGeminiEmbedder', () => {
 
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.data).toHaveLength(3)
-      expect(result.data[0]).toHaveLength(EMBEDDING_DIMENSIONS)
+      expect(result.data.vectors).toHaveLength(3)
+      expect(result.data.vectors[0]).toHaveLength(EMBEDDING_DIMENSIONS)
     }
   })
 
@@ -112,5 +112,22 @@ describe('createGeminiEmbedder', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error.code).toBe('AI_REQUEST_FAILED')
+  })
+})
+
+describe('createGeminiEmbedder の使用量', () => {
+  it('埋め込み API はトークン数を返さないため 0 のままとし、文字数で規模を表す', async () => {
+    // 2026-08-31 の実測では応答に embedding しか含まれない。
+    // 取れない値を文字数から推定すると、履歴が実測値のように見えてしまう
+    embedContent.mockResolvedValue(vectors(2))
+    const result = await createGeminiEmbedder().embed(['あいう', 'かきくけこ'])
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.data.usage.inputTokens).toBe(0)
+      expect(result.data.usage.outputTokens).toBe(0)
+      expect(result.data.usage.inputChars).toBe(8)
+      expect(result.data.usage.model).toBeTruthy()
+    }
   })
 })

@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
+import { readUsage } from './usage'
 import { TimeoutError, withTimeout } from './with-timeout'
 import {
   EXTRACTION_SCHEMA,
@@ -11,9 +13,7 @@ import {
 export type ExtractionResult = {
   tasks: ExtractedTask[]
   document_summary: string
-  model: string
-  inputTokens: number
-  outputTokens: number
+  usage: AiUsage
 }
 
 export interface TaskExtractor {
@@ -59,6 +59,9 @@ export function createGeminiTaskExtractor(): TaskExtractor {
         process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
       ].filter((model, index, all) => all.indexOf(model) === index)
 
+      // PDF は本体を送るため文字数を測れない。推定せず 0 とする
+      const inputChars = 'pdf' in input ? 0 : input.text.length
+
       const contents =
         'pdf' in input
           ? [
@@ -90,15 +93,9 @@ export function createGeminiTaskExtractor(): TaskExtractor {
           const parsed = parseExtractionResponse(outputText)
           if (!parsed.ok) return parsed
 
-          const usage = (interaction as {
-            usage?: { total_input_tokens?: number; total_output_tokens?: number }
-          }).usage
-
           return ok({
             ...parsed.data,
-            model,
-            inputTokens: usage?.total_input_tokens ?? 0,
-            outputTokens: usage?.total_output_tokens ?? 0,
+            usage: readUsage(interaction, model, inputChars),
           })
         } catch (error) {
           if (!isRetryable(error)) {

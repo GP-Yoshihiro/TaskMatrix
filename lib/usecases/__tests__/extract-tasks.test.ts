@@ -85,9 +85,12 @@ function makeDeps(): Deps {
       ok({
         tasks: [aiTask],
         document_summary: '要約',
-        model: 'gemini-3.5-flash',
-        inputTokens: 43,
-        outputTokens: 290,
+        usage: {
+          model: 'gemini-3.5-flash',
+          inputTokens: 43,
+          outputTokens: 290,
+          inputChars: 0,
+        },
       }),
     ),
   }
@@ -143,9 +146,12 @@ describe('extractTasksFromFile', () => {
       ok({
         tasks: [{ ...aiTask, due_date: '2026-09-10' }],
         document_summary: '',
-        model: 'm',
-        inputTokens: 0,
-        outputTokens: 0,
+        usage: {
+          model: 'm',
+          inputTokens: 0,
+          outputTokens: 0,
+          inputChars: 0,
+        },
       }),
     )
     const result = await extractTasksFromFile(deps, { projectId: 'p1', fileId: 'f1', userId: 'u1' })
@@ -204,9 +210,12 @@ describe('extractTasksFromFile', () => {
       ok({
         tasks: [{ ...aiTask, priority: 'urgent' }],
         document_summary: '',
-        model: 'm',
-        inputTokens: 0,
-        outputTokens: 0,
+        usage: {
+          model: 'm',
+          inputTokens: 0,
+          outputTokens: 0,
+          inputChars: 0,
+        },
       }),
     )
     const result = await extractTasksFromFile(deps, { projectId: 'p1', fileId: 'f1', userId: 'u1' })

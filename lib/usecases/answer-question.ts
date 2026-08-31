@@ -1,4 +1,5 @@
 import { type Result, err, ok } from '@/lib/domain/result'
+import type { AiUsage } from '@/lib/domain/usage'
 import { buildExcerpt, trimHistory } from '@/lib/domain/rag'
 import type { QuestionAnswerer } from '@/lib/gemini/answer-question'
 import type { Embedder } from '@/lib/gemini/embeddings'
@@ -26,7 +27,7 @@ type Deps = {
 export async function answerQuestion(
   deps: Deps,
   input: { projectId: string; userId: string; question: string },
-): Promise<Result<{ answer: string; sources: ChatSource[] }>> {
+): Promise<Result<{ answer: string; sources: ChatSource[]; usage: AiUsage }>> {
   const question = input.question.trim()
   if (question.length === 0) {
     return err('VALIDATION_ERROR', '質問を入力してください。')
@@ -37,7 +38,7 @@ export async function answerQuestion(
 
   const matches = await deps.chunks.search({
     projectId: input.projectId,
-    embedding: embedded.data[0],
+    embedding: embedded.data.vectors[0],
     limit: MATCH_COUNT,
   })
 
@@ -92,9 +93,15 @@ export async function answerQuestion(
   await deps.chat.addMessage({
     sessionId: session.id,
     role: 'assistant',
-    content: answered.data,
+    content: answered.data.text,
     sources,
   })
 
-  return ok({ answer: answered.data, sources })
+  // 質問の埋め込みはトークンを返さないため、文字数だけを合算する
+  const usage: AiUsage = {
+    ...answered.data.usage,
+    inputChars: answered.data.usage.inputChars + embedded.data.usage.inputChars,
+  }
+
+  return ok({ answer: answered.data.text, sources, usage })
 }
