@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { decideProtectedRouteAction, isConnectivityFailure } from '@/lib/domain/auth'
 
 /** 保護対象のパス接頭辞 */
 const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/settings']
@@ -29,16 +30,35 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // 認証サービスに到達できない場合と、認証されていない場合を区別する。
+  // 混同すると、通信が不安定なだけの利用者をログアウト扱いにしてしまう。
+  let hasUser = false
+  let connectivityFailed = false
+
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    hasUser = data.user !== null
+    connectivityFailed = isConnectivityFailure(error)
+  } catch (error) {
+    connectivityFailed = isConnectivityFailure(
+      error as { message?: string; name?: string; status?: number },
+    )
+  }
 
   const path = request.nextUrl.pathname
   const isProtected = PROTECTED_PREFIXES.some((prefix) => path.startsWith(prefix))
 
-  if (!user && isProtected) {
+  const action = decideProtectedRouteAction({ hasUser, connectivityFailed, isProtected })
+
+  if (action === 'login') {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
+
+  if (action === 'offline') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/offline'
     return NextResponse.redirect(url)
   }
 
