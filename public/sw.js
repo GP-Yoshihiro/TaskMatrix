@@ -6,6 +6,11 @@
  * **どちらかを変えたら必ず両方を直すこと。**
  * ずれるとテストが実態を保証しなくなる。
  *
+ * 注意: caches.match には必ず { ignoreVary: true } を渡すこと。
+ * Next.js の応答は Vary に Accept-Encoding を含むため、
+ * 既定の照合では保存したものを取り出せず、キャッシュに入っているのに
+ * 取り出せないという分かりにくい不具合になる。
+ *
  * 守るべき一線:
  * - GET 以外には一切介入しない（Server Actions は POST）
  * - 別オリジン（Supabase / Gemini）に触れない
@@ -13,7 +18,7 @@
  * - 利用者のデータをキャッシュしない
  */
 
-const CACHE_NAME = 'taskmatrix-shell-v1'
+const CACHE_NAME = 'taskmatrix-shell-v2'
 
 const APP_SHELL = [
   '/offline',
@@ -77,7 +82,9 @@ self.addEventListener('fetch', (event) => {
   if (strategy === 'network-first') {
     event.respondWith(
       fetch(event.request).catch(() =>
-        caches.match('/offline').then(
+        // ignoreVary が必須。Next.js の応答は Vary に Accept-Encoding を含み、
+        // 既定の照合では保存したものを取り出せない
+        caches.match('/offline', { ignoreVary: true }).then(
           (cached) =>
             cached ??
             new Response('オフラインです。インターネット接続をご確認ください。', {
@@ -91,7 +98,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
+    caches.match(event.request, { ignoreVary: true }).then((cached) => {
       if (cached) return cached
       return fetch(event.request).then((response) => {
         if (response.ok) {
