@@ -107,20 +107,26 @@ async function runFetch(
   handlers: Handlers,
   request: { method: string; url: string; mode: string },
 ): Promise<{ responded: boolean; body: string | null }> {
-  let responded = false
-  let promise: Promise<{ text(): Promise<string> }> | null = null
+  // コールバック内での代入は TypeScript の絞り込みが追えないため、
+  // 変数ではなくオブジェクトの属性で受け取る
+  const captured: {
+    responded: boolean
+    promise: Promise<{ text(): Promise<string> }> | null
+  } = { responded: false, promise: null }
 
   handlers.fetch({
     request,
     respondWith: (value: Promise<{ text(): Promise<string> }>) => {
-      responded = true
-      promise = value
+      captured.responded = true
+      captured.promise = value
     },
   })
 
-  if (!responded || !promise) return { responded: false, body: null }
+  if (!captured.responded || !captured.promise) {
+    return { responded: false, body: null }
+  }
 
-  const response = await promise
+  const response = await captured.promise
   return { responded: true, body: await response.text() }
 }
 
