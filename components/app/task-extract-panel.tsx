@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { extractTasksAction, registerTasksAction } from '@/lib/actions/extraction'
+import { callAction } from '@/lib/client/safe-action'
 import { PRIORITY_LABEL } from '@/lib/domain/tasks'
 import type { TaskSuggestion } from '@/lib/usecases/extract-tasks'
 
@@ -43,7 +44,7 @@ export function TaskExtractPanel({
     formData.set('fileId', fileId)
 
     startTransition(async () => {
-      const result = await extractTasksAction(formData)
+      const result = await callAction(() => extractTasksAction(formData))
       if (result.ok) {
         setSuggestions(result.data.suggestions)
         setSummary(result.data.summary)
@@ -81,7 +82,7 @@ export function TaskExtractPanel({
     formData.set('suggestions', JSON.stringify(picked))
 
     startTransition(async () => {
-      const result = await registerTasksAction(formData)
+      const result = await callAction(() => registerTasksAction(formData))
       if (result.ok) {
         setMessage(`${result.data} 件のタスクを登録しました。`)
         setSuggestions(null)
