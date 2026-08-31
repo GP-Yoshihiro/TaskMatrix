@@ -17,6 +17,9 @@ export type AppErrorCode =
   | 'NO_SCHEDULABLE_TASKS'
   | 'INVALID_SCHEDULE_RANGE'
   | 'NETWORK_ERROR'
+  | 'NO_INDEXED_CONTENT'
+  | 'TOO_MANY_CHUNKS'
+  | 'EMBEDDING_COUNT_MISMATCH'
   | 'UNKNOWN'
 
 export type AppError = {
