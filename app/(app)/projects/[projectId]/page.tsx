@@ -1,13 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { ApiTokenPanel } from '@/components/app/api-token-panel'
 import { FileList } from '@/components/app/file-list'
 import { FileUploadForm } from '@/components/app/file-upload-form'
 import { FolderTree } from '@/components/app/folder-tree'
 import { MarkdownCreateForm } from '@/components/app/markdown-create-form'
 import { buildFolderTree } from '@/lib/domain/folders'
+import { createSupabaseApiTokenRepository } from '@/lib/repositories/api-tokens'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createSupabaseFolderRepository } from '@/lib/repositories/folders'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 
 export default async function ProjectDetailPage({
   params,
@@ -30,6 +33,13 @@ export default async function ProjectDetailPage({
     createSupabaseFileRepository(supabase).listByProject(projectId),
   ])
 
+  const tokens = await createSupabaseApiTokenRepository(supabase).listByProject(projectId)
+
+  // ショートカットに貼り付ける URL は、いま開いている場所から組み立てる
+  const requestHeaders = await headers()
+  const host = requestHeaders.get('host') ?? 'localhost:3000'
+  const protocol = host.startsWith('localhost') ? 'http' : 'https'
+
   return (
     <div style={{ display: 'grid', gap: 32, maxWidth: 900 }}>
       <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -45,6 +55,12 @@ export default async function ProjectDetailPage({
         <FileUploadForm projectId={projectId} folderId={null} />
         <FileList projectId={projectId} files={files} />
       </section>
+      <ApiTokenPanel
+        projectId={projectId}
+        tokens={tokens}
+        origin={`${protocol}://${host}`}
+        configured={Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)}
+      />
     </div>
   )
 }
