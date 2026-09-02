@@ -40,12 +40,6 @@ function entry(overrides: Partial<HistoryEntry> & { id: string }): HistoryEntry 
 }
 
 describe('HistoryList', () => {
-  it('履歴が無ければその旨を示す', () => {
-    render(<HistoryList projectId="p1" initialEntries={[]} initialHasMore={false} />)
-
-    expect(screen.getByText('まだ変更履歴がありません。')).toBeInTheDocument()
-  })
-
   it('日付・ファイル名・変更項目・変更者名を並べる', () => {
     render(
       <HistoryList projectId="p1" initialEntries={[entry({ id: 'h1' })]} initialHasMore={false} />,
@@ -165,5 +159,87 @@ describe('HistoryList', () => {
     )
 
     expect(screen.queryByText('これ以上の履歴はありません。')).not.toBeInTheDocument()
+  })
+})
+
+describe('HistoryList の絞り込み', () => {
+  it('条件が無いときは「まだ」と伝える', () => {
+    render(<HistoryList projectId="p1" initialEntries={[]} initialHasMore={false} />)
+
+    expect(screen.getByText('まだ変更履歴がありません。')).toBeInTheDocument()
+  })
+
+  it('条件があるときは条件に合わないと伝える', () => {
+    // 「まだ無い」と「絞り込んだ結果が無い」は原因が違う
+    render(
+      <HistoryList
+        projectId="p1"
+        initialEntries={[]}
+        initialHasMore={false}
+        filter={{ fileName: '存在しない', extension: '', from: '', to: '' }}
+      />,
+    )
+
+    expect(screen.getByText('条件に合う変更履歴がありません。')).toBeInTheDocument()
+  })
+
+  it('編集を押すと選ばれた行を伝える', () => {
+    const onSelect = vi.fn()
+    render(
+      <HistoryList
+        projectId="p1"
+        initialEntries={[entry({ id: 'h1', action: 'updated' })]}
+        initialHasMore={false}
+        onSelect={onSelect}
+      />,
+    )
+
+    screen.getByRole('button', { name: '編集' }).click()
+
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'h1' }))
+  })
+
+  it('追加や削除は押せない', () => {
+    // 差分が無い操作を押せると、開いても何も出ず戸惑わせる
+    const onSelect = vi.fn()
+    render(
+      <HistoryList
+        projectId="p1"
+        initialEntries={[
+          entry({ id: 'h1', action: 'created' }),
+          entry({ id: 'h2', action: 'deleted' }),
+        ]}
+        initialHasMore={false}
+        onSelect={onSelect}
+      />,
+    )
+
+    expect(screen.queryByRole('button', { name: '追加' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '削除' })).not.toBeInTheDocument()
+  })
+
+  it('絞り込みの条件を送る', async () => {
+    loadMore.mockResolvedValue({ ok: true, data: { entries: [], hasMore: false } })
+
+    const view = render(
+      <HistoryList projectId="p1" initialEntries={[]} initialHasMore={false} />,
+    )
+
+    view.rerender(
+      <HistoryList
+        projectId="p1"
+        initialEntries={[]}
+        initialHasMore={false}
+        filter={{ fileName: '要件', extension: 'md', from: '2026-09-01', to: '2026-09-30' }}
+      />,
+    )
+
+    await waitFor(() => expect(loadMore).toHaveBeenCalled())
+
+    const formData = loadMore.mock.calls[0][0] as FormData
+    expect(formData.get('fileName')).toBe('要件')
+    expect(formData.get('extension')).toBe('md')
+    expect(formData.get('from')).toBe('2026-09-01')
+    expect(formData.get('to')).toBe('2026-09-30')
   })
 })

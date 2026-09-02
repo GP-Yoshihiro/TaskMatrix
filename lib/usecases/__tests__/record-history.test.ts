@@ -12,6 +12,7 @@ function createRepository(overrides: Partial<HistoryRepository> = {}) {
     },
     listByProject: async () => [],
     countByProject: async () => 0,
+    findChanges: async () => null,
     ...overrides,
   }
 

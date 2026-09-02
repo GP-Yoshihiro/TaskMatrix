@@ -5,6 +5,11 @@ import { Button } from '@/components/ui/button'
 import { loadMoreHistoryAction } from '@/lib/actions/history'
 import { callAction } from '@/lib/client/safe-action'
 import { ACTION_LABEL, fileColor, summarizeChanges } from '@/lib/domain/history'
+import {
+  EMPTY_FILTER,
+  type HistoryFilter,
+  isEmptyFilter,
+} from '@/lib/domain/history-filter'
 import type { HistoryEntry } from '@/lib/repositories/history'
 
 type Order = 'desc' | 'asc'
@@ -18,8 +23,7 @@ const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
 
 /**
  * 1 行に収めるための省略。
- * ファイル名と変更者名は幅が足りなければ末尾を省略する。
- * 行の高さが揃っていないと、量が多いときに一覧として読めないため。
+ * 行の高さが揃っていないと、量が多いときに一覧として読めない。
  */
 const ellipsis = {
   overflow: 'hidden',
@@ -31,10 +35,16 @@ export function HistoryList({
   projectId,
   initialEntries,
   initialHasMore,
+  filter = EMPTY_FILTER,
+  selectedId = null,
+  onSelect,
 }: {
   projectId: string
   initialEntries: HistoryEntry[]
   initialHasMore: boolean
+  filter?: HistoryFilter
+  selectedId?: string | null
+  onSelect?: (entry: HistoryEntry) => void
 }) {
   const [entries, setEntries] = useState(initialEntries)
   const [hasMore, setHasMore] = useState(initialHasMore)
@@ -44,13 +54,17 @@ export function HistoryList({
   const sentinel = useRef<HTMLDivElement | null>(null)
 
   const load = useCallback(
-    async (nextOrder: Order, cursor: HistoryEntry | null) => {
+    async (nextOrder: Order, nextFilter: HistoryFilter, cursor: HistoryEntry | null) => {
       setLoading(true)
       setMessage(null)
 
       const formData = new FormData()
       formData.set('projectId', projectId)
       formData.set('order', nextOrder)
+      formData.set('fileName', nextFilter.fileName)
+      formData.set('extension', nextFilter.extension)
+      formData.set('from', nextFilter.from)
+      formData.set('to', nextFilter.to)
       if (cursor) {
         formData.set('cursorCreatedAt', cursor.createdAt)
         formData.set('cursorId', cursor.id)
@@ -76,8 +90,21 @@ export function HistoryList({
     if (next === order) return
     setOrder(next)
     setEntries([])
-    void load(next, null)
+    void load(next, filter, null)
   }
+
+  // 条件が変わったら先頭から読み直す。最初の描画では読み直さない
+  const firstRender = useRef(true)
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false
+      return
+    }
+    setEntries([])
+    void load(order, filter, null)
+    // order は changeOrder が自分で読み直すため、依存に入れない
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, load])
 
   // 末尾が見えたら続きを読む
   useEffect(() => {
@@ -87,15 +114,15 @@ export function HistoryList({
     const observer = new IntersectionObserver((records) => {
       if (!records[0]?.isIntersecting) return
       const last = entries[entries.length - 1]
-      void load(order, last ?? null)
+      void load(order, filter, last ?? null)
     })
 
     observer.observe(target)
     return () => observer.disconnect()
-  }, [entries, hasMore, loading, order, load])
+  }, [entries, hasMore, loading, order, filter, load])
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <Button
           size="sm"
@@ -115,7 +142,9 @@ export function HistoryList({
 
       {entries.length === 0 && !loading ? (
         <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
-          まだ変更履歴がありません。
+          {isEmptyFilter(filter)
+            ? 'まだ変更履歴がありません。'
+            : '条件に合う変更履歴がありません。'}
         </p>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 2 }}>
@@ -124,14 +153,17 @@ export function HistoryList({
               key={entry.id}
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'auto auto minmax(0, 1fr) auto minmax(0, 8rem)',
+                gridTemplateColumns: 'auto auto minmax(0, 1fr) auto minmax(0, 7rem)',
                 gap: 10,
                 alignItems: 'center',
                 padding: '6px 8px',
                 borderRadius: 6,
                 fontSize: '0.85rem',
                 lineHeight: 1.4,
-                background: 'var(--color-surface)',
+                background:
+                  entry.id === selectedId
+                    ? 'color-mix(in srgb, var(--color-accent) 16%, var(--color-surface))'
+                    : 'var(--color-surface)',
               }}
             >
               {/* ① 形式ごとの色 */}
@@ -146,8 +178,10 @@ export function HistoryList({
               />
 
               {/* ② 日付 */}
-              <span style={{ color: 'var(--color-fg-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                {dateFormatter.format(new Date(entry.createdAt)).replaceAll('/', '/')}
+              <span
+                style={{ color: 'var(--color-fg-muted)', fontVariantNumeric: 'tabular-nums' }}
+              >
+                {dateFormatter.format(new Date(entry.createdAt))}
               </span>
 
               {/* ③ ファイル名（省略可） */}
@@ -155,21 +189,44 @@ export function HistoryList({
                 {entry.fileName}
               </span>
 
-              {/* ④ 変更項目 */}
-              <span
-                title={summarizeChanges(entry)}
-                style={{
-                  whiteSpace: 'nowrap',
-                  textDecoration: entry.action === 'updated' ? 'underline' : 'none',
-                  color:
-                    entry.action === 'deleted' ? 'var(--color-danger)' : 'var(--color-fg)',
-                }}
-              >
-                {ACTION_LABEL[entry.action]}
-              </span>
+              {/* ④ 変更項目。編集は開ける */}
+              {entry.action === 'updated' && onSelect ? (
+                <button
+                  type="button"
+                  onClick={() => onSelect(entry)}
+                  title={summarizeChanges(entry)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    textDecoration: 'underline',
+                    color: 'var(--color-fg)',
+                    font: 'inherit',
+                  }}
+                >
+                  {ACTION_LABEL.updated}
+                </button>
+              ) : (
+                <span
+                  title={summarizeChanges(entry)}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    textDecoration: entry.action === 'updated' ? 'underline' : 'none',
+                    color:
+                      entry.action === 'deleted' ? 'var(--color-danger)' : 'var(--color-fg)',
+                  }}
+                >
+                  {ACTION_LABEL[entry.action]}
+                </span>
+              )}
 
               {/* ⑤ 変更者名（省略可） */}
-              <span style={{ ...ellipsis, color: 'var(--color-fg-muted)' }} title={entry.authorName}>
+              <span
+                style={{ ...ellipsis, color: 'var(--color-fg-muted)' }}
+                title={entry.authorName}
+              >
                 {entry.authorName}
               </span>
             </li>

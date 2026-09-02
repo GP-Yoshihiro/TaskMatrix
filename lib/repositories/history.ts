@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Change, HistoryAction } from '@/lib/domain/history'
+import type { HistoryFilter } from '@/lib/domain/history-filter'
 import { resolveAuthorName } from '@/lib/domain/profile'
 
 export type HistoryEntry = {
@@ -40,12 +41,15 @@ export type ListHistoryInput = {
   limit: number
   /** 続きを読むための位置。前回の最後の created_at を渡す */
   cursor?: { createdAt: string; id: string }
+  filter?: HistoryFilter
 }
 
 export interface HistoryRepository {
   record(input: RecordHistoryInput): Promise<void>
   listByProject(input: ListHistoryInput): Promise<HistoryEntry[]>
   countByProject(projectId: string): Promise<number>
+  /** 差分は一覧に載せず、開いたときだけ取りに行く */
+  findChanges(id: string): Promise<{ changes: Change[]; truncated: boolean } | null>
 }
 
 type Row = {
@@ -128,6 +132,23 @@ export function createSupabaseHistoryRepository(
         .order('id', { ascending })
         .limit(input.limit)
 
+      const filter = input.filter
+      if (filter?.fileName) {
+        // 部分一致。大文字小文字は区別しない
+        query = query.ilike('file_name', `%${filter.fileName}%`)
+      }
+      if (filter?.extension) {
+        query = query.eq('file_extension', filter.extension)
+      }
+      // 索引を活かすため、created_at をそのまま範囲で比べる。
+      // 日付に変換する関数を噛ませると索引が効かない
+      if (filter?.from) {
+        query = query.gte('created_at', `${filter.from}T00:00:00+09:00`)
+      }
+      if (filter?.to) {
+        query = query.lte('created_at', `${filter.to}T23:59:59.999+09:00`)
+      }
+
       if (input.cursor) {
         const operator = ascending ? 'gt' : 'lt'
         query = query.or(
@@ -140,6 +161,19 @@ export function createSupabaseHistoryRepository(
       if (error) throw error
 
       return ((data ?? []) as unknown as Row[]).map(toEntry)
+    },
+
+    async findChanges(id) {
+      const { data, error } = await supabase
+        .from('history_entries')
+        .select('changes, truncated')
+        .eq('id', id)
+        .maybeSingle()
+      if (error) throw error
+      if (!data) return null
+
+      const row = data as { changes: Change[]; truncated: boolean }
+      return { changes: row.changes ?? [], truncated: row.truncated }
     },
 
     async countByProject(projectId) {
