@@ -50,6 +50,12 @@ export interface HistoryRepository {
   countByProject(projectId: string): Promise<number>
   /** 差分は一覧に載せず、開いたときだけ取りに行く */
   findChanges(id: string): Promise<{ changes: Change[]; truncated: boolean } | null>
+  /** 容量が足りないときに、保護対象を除いて古い順に消す */
+  deleteOldest(input: {
+    projectId: string
+    protectedFileIds: string[]
+    limit: number
+  }): Promise<number>
 }
 
 type Row = {
@@ -133,6 +139,24 @@ export function createSupabaseHistoryRepository(
         .limit(input.limit)
 
       const filter = input.filter
+      if (filter?.tag) {
+        // タグはファイルに付くため、そのタグが付いたファイルの履歴を引く
+        const { data: tagged, error: tagError } = await supabase
+          .from('file_tags')
+          .select('file_id, tags!inner(project_id, name)')
+          .eq('tags.project_id', input.projectId)
+          .eq('tags.name', filter.tag)
+        if (tagError) throw tagError
+
+        const ids = [
+          ...new Set(((tagged ?? []) as { file_id: string }[]).map((row) => row.file_id)),
+        ]
+
+        // 該当が無ければ、条件に合う履歴も無い
+        if (ids.length === 0) return []
+
+        query = query.in('file_id', ids)
+      }
       if (filter?.fileName) {
         // 部分一致。大文字小文字は区別しない
         query = query.ilike('file_name', `%${filter.fileName}%`)
@@ -174,6 +198,35 @@ export function createSupabaseHistoryRepository(
 
       const row = data as { changes: Change[]; truncated: boolean }
       return { changes: row.changes ?? [], truncated: row.truncated }
+    },
+
+    async deleteOldest({ projectId, protectedFileIds, limit }) {
+      // 消す対象を先に選ぶ。古い順に、保護対象のファイルを除く
+      let query = supabase
+        .from('history_entries')
+        .select('id')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(limit)
+
+      if (protectedFileIds.length > 0) {
+        // ファイルが消えている履歴（file_id が null）も対象に含める
+        query = query.or(
+          `file_id.is.null,file_id.not.in.(${protectedFileIds.join(',')})`,
+        )
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+
+      const ids = ((data ?? []) as { id: string }[]).map((row) => row.id)
+      if (ids.length === 0) return 0
+
+      const removed = await supabase.from('history_entries').delete().in('id', ids)
+      if (removed.error) throw removed.error
+
+      return ids.length
     },
 
     async countByProject(projectId) {

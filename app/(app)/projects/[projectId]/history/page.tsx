@@ -4,7 +4,9 @@ import { HistoryView } from '@/components/app/history-view'
 import { HISTORY_PAGE_SIZE } from '@/lib/domain/history'
 import { parseFilter } from '@/lib/domain/history-filter'
 import { createSupabaseHistoryRepository } from '@/lib/repositories/history'
+import { createSupabaseTagRepository } from '@/lib/repositories/tags'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { purgeHistory } from '@/lib/usecases/purge-history'
 
 export default async function HistoryPage({
   params,
@@ -34,12 +36,37 @@ export default async function HistoryPage({
     ),
   )
 
-  const entries = await createSupabaseHistoryRepository(supabase).listByProject({
-    projectId,
-    order: 'desc',
-    limit: HISTORY_PAGE_SIZE,
-    filter,
-  })
+  const history = createSupabaseHistoryRepository(supabase)
+  const tagRepository = createSupabaseTagRepository(supabase)
+
+  // 容量が上限に近づいていれば、ここで古い履歴を整理する。
+  // 定期実行の仕組みが無いため、履歴を見る操作に合わせて行う。
+  // 失敗しても画面は出す（整理は付随的な処理のため）
+  try {
+    await purgeHistory(
+      {
+        databaseSizeBytes: async () => {
+          const { data } = await supabase.rpc('database_size_bytes')
+          return Number(data ?? 0)
+        },
+        listLockedFileIds: (id) => tagRepository.listLockedFileIds(id),
+        deleteOldest: (input) => history.deleteOldest(input),
+      },
+      projectId,
+    )
+  } catch {
+    // 整理できなくても履歴は見られる
+  }
+
+  const [entries, tags] = await Promise.all([
+    history.listByProject({
+      projectId,
+      order: 'desc',
+      limit: HISTORY_PAGE_SIZE,
+      filter,
+    }),
+    tagRepository.listByProject(projectId),
+  ])
 
   return (
     <div style={{ display: 'grid', gap: 20, maxWidth: 1400 }}>
@@ -59,6 +86,7 @@ export default async function HistoryPage({
         initialEntries={entries}
         initialHasMore={entries.length === HISTORY_PAGE_SIZE}
         initialFilter={filter}
+        tags={tags}
       />
     </div>
   )

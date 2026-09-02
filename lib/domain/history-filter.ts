@@ -14,6 +14,8 @@ export type HistoryFilter = {
   from: string
   /** 期間の終了（YYYY-MM-DD） */
   to: string
+  /** タグ名の完全一致 */
+  tag: string
 }
 
 export const EMPTY_FILTER: HistoryFilter = {
@@ -21,6 +23,7 @@ export const EMPTY_FILTER: HistoryFilter = {
   extension: '',
   from: '',
   to: '',
+  tag: '',
 }
 
 export function isEmptyFilter(filter: HistoryFilter): boolean {
@@ -28,7 +31,8 @@ export function isEmptyFilter(filter: HistoryFilter): boolean {
     filter.fileName.trim() === '' &&
     filter.extension.trim() === '' &&
     filter.from.trim() === '' &&
-    filter.to.trim() === ''
+    filter.to.trim() === '' &&
+    filter.tag.trim() === ''
   )
 }
 
@@ -77,6 +81,7 @@ export function parseFilter(params: URLSearchParams): HistoryFilter {
     extension: (params.get('extension') ?? '').trim().toLowerCase(),
     from: (params.get('from') ?? '').trim(),
     to: (params.get('to') ?? '').trim(),
+    tag: (params.get('tag') ?? '').trim(),
   }
 }
 
@@ -88,6 +93,7 @@ export function toSearchParams(filter: HistoryFilter): URLSearchParams {
   if (filter.extension.trim()) params.set('extension', filter.extension.trim())
   if (filter.from.trim()) params.set('from', filter.from.trim())
   if (filter.to.trim()) params.set('to', filter.to.trim())
+  if (filter.tag.trim()) params.set('tag', filter.tag.trim())
 
   return params
 }

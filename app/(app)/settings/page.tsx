@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { DisplayNameForm } from '@/components/app/display-name-form'
 import { ThemeSwitcher } from '@/components/app/theme-switcher'
 import { WorkSettingsForm } from '@/components/app/work-settings-form'
+import { formatUsage } from '@/lib/domain/capacity'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
 import type { ThemePreference } from '@/lib/platform/theme'
@@ -29,6 +30,15 @@ export default async function SettingsPage() {
     (await createSupabaseWorkSettingsRepository(supabase).find(user.id)) ??
     DEFAULT_WORK_SETTINGS
 
+  // 読めなくても設定画面は出す（表示は補助的な情報のため）
+  let usage: string | null = null
+  try {
+    const { data } = await supabase.rpc('database_size_bytes')
+    usage = formatUsage(Number(data ?? 0))
+  } catch {
+    usage = null
+  }
+
   return (
     <div style={{ display: 'grid', gap: 24, maxWidth: 640 }}>
       <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>設定</h1>
@@ -47,6 +57,16 @@ export default async function SettingsPage() {
         <h2 style={{ fontWeight: 600 }}>表示テーマ</h2>
         <ThemeSwitcher current={current} />
       </section>
+      {usage && (
+        <section style={{ display: 'grid', gap: 8 }}>
+          <h2 style={{ fontWeight: 600 }}>データベースの使用量</h2>
+          <p style={{ fontSize: '0.95rem' }}>{usage}</p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+            変更履歴は期限では消えません。上限に近づいたときだけ、
+            ロック付きのタグが付いたファイルを除いて古い順に整理します。
+          </p>
+        </section>
+      )}
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>AI の使用量</h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>

@@ -18,9 +18,12 @@ const label = { fontSize: '0.78rem', color: 'var(--color-fg-muted)' } as const
 export function HistorySearch({
   filter,
   onChange,
+  tags = [],
 }: {
   filter: HistoryFilter
   onChange: (filter: HistoryFilter) => void
+  /** プロジェクト内で使われているタグ */
+  tags?: { id: string; name: string; locked: boolean }[]
 }) {
   const [draft, setDraft] = useState(filter)
   const [error, setError] = useState<string | null>(null)
@@ -112,6 +115,32 @@ export function HistorySearch({
             ))}
           </select>
         </div>
+
+        {tags.length > 0 && (
+          <div style={{ display: 'grid', gap: 2 }}>
+            <span style={label}>タグ</span>
+            <select
+              value={draft.tag}
+              onChange={(event) => apply({ ...draft, tag: event.target.value })}
+              aria-label="タグで絞り込む"
+              style={{
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface)',
+                color: 'var(--color-fg)',
+                fontSize: '0.9rem',
+              }}
+            >
+              <option value="">すべて</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.name}>
+                  {tag.locked ? `🔒 ${tag.name}` : tag.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: 2 }}>
           <span style={label}>年月</span>

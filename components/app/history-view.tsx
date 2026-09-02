@@ -26,11 +26,13 @@ export function HistoryView({
   initialEntries,
   initialHasMore,
   initialFilter,
+  tags,
 }: {
   projectId: string
   initialEntries: HistoryEntry[]
   initialHasMore: boolean
   initialFilter: HistoryFilter
+  tags: { id: string; name: string; locked: boolean }[]
 }) {
   const [filter, setFilter] = useState(initialFilter)
   const [selected, setSelected] = useState<HistoryEntry | null>(null)
@@ -95,7 +97,7 @@ export function HistoryView({
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
-      <HistorySearch filter={filter} onChange={setFilter} />
+      <HistorySearch filter={filter} onChange={setFilter} tags={tags} />
 
       <div
         ref={container}

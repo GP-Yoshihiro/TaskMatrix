@@ -25,6 +25,7 @@ export async function loadMoreHistoryAction(
       extension: String(formData.get('extension') ?? ''),
       from: String(formData.get('from') ?? ''),
       to: String(formData.get('to') ?? ''),
+      tag: String(formData.get('tag') ?? ''),
     }),
   )
 
