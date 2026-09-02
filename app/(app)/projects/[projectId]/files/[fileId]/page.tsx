@@ -36,7 +36,7 @@ export default async function FilePage({
     <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
       <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 600 }}>{file.name}</h1>
-        <Link href={`/projects/${projectId}/files/${fileId}/history`}>変更履歴</Link>
+        <Link href={`/projects/${projectId}/history`}>変更履歴</Link>
         <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
       </header>
 

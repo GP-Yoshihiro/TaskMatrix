@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { DisplayNameForm } from '@/components/app/display-name-form'
 import { ThemeSwitcher } from '@/components/app/theme-switcher'
 import { WorkSettingsForm } from '@/components/app/work-settings-form'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
@@ -17,7 +18,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('theme, email')
+    .select('theme, email, display_name')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -34,6 +35,13 @@ export default async function SettingsPage() {
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>アカウント</h2>
         <p style={{ color: 'var(--color-fg-muted)' }}>{profile?.email}</p>
+      </section>
+      <section style={{ display: 'grid', gap: 8 }}>
+        <h2 style={{ fontWeight: 600 }}>表示名</h2>
+        <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+          変更履歴に表示される名前です。未登録のときはメールアドレスの @ より前を使います。
+        </p>
+        <DisplayNameForm current={profile?.display_name ?? ''} />
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>表示テーマ</h2>

@@ -26,6 +26,7 @@ function makeDeps(file: ProjectFile | null) {
   }
   const versions: FileVersionRepository = {
     listByFile: vi.fn(async () => [] as FileVersion[]),
+    deleteOlderThan: vi.fn(async () => {}),
     findByVersion: vi.fn(async () => null),
     create: vi.fn(async (input) => ({
       id: 'v',

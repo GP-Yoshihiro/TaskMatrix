@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { buildStoragePath, normalizeLineEndings, validateUpload } from '@/lib/domain/files'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
+import { createSupabaseHistoryRepository } from '@/lib/repositories/history'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { readAuthorName } from '@/lib/usecases/current-author'
+import { recordHistory } from '@/lib/usecases/record-history'
 
 const BUCKET = 'project-files'
 
@@ -41,8 +44,12 @@ export async function uploadFileAction(formData: FormData): Promise<Result<null>
       createdBy: user.id,
     })
 
+    // 履歴に残す本文。バイナリは中身を読まない（更新の経路が無く差分が生じないため）
+    let uploadedText = ''
+
     if (isText) {
       const content = normalizeLineEndings(await file.text())
+      uploadedText = content
       const size = new TextEncoder().encode(content).length
       const { error } = await supabase.from('file_versions').insert({
         file_id: created.id,
@@ -86,6 +93,19 @@ export async function uploadFileAction(formData: FormData): Promise<Result<null>
       })
       if (error) throw error
     }
+
+    await recordHistory(createSupabaseHistoryRepository(supabase), {
+      projectId,
+      fileId: created.id,
+      fileName: validated.data.name,
+      fileKind: validated.data.kind,
+      action: 'created',
+      version: 1,
+      before: '',
+      after: uploadedText,
+      authorId: user.id,
+      authorName: await readAuthorName(supabase, user.id),
+    })
   } catch {
     return err('UNKNOWN', 'ファイルを登録できませんでした。')
   }
@@ -100,7 +120,28 @@ export async function deleteFileAction(formData: FormData): Promise<Result<null>
   if (!id) return err('VALIDATION_ERROR', '対象のファイルが指定されていません。')
 
   const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
+
+  const files = createSupabaseFileRepository(supabase)
+
   try {
+    // 消してしまうと何を消したのか分からなくなるため、先に読んでおく
+    const target = await files.findById(id)
+    const lastContent =
+      target && target.kind !== 'binary'
+        ? ((
+            await supabase
+              .from('file_versions')
+              .select('content')
+              .eq('file_id', id)
+              .eq('version', target.currentVersion)
+              .maybeSingle()
+          ).data as { content: string | null } | null)?.content ?? ''
+        : ''
+
     const { data } = await supabase
       .from('file_versions')
       .select('storage_path')
@@ -114,7 +155,21 @@ export async function deleteFileAction(formData: FormData): Promise<Result<null>
       await supabase.storage.from(BUCKET).remove(paths)
     }
 
-    await createSupabaseFileRepository(supabase).remove(id)
+    await files.remove(id)
+
+    // 履歴はファイルから独立しているため、ファイルを消しても残る
+    await recordHistory(createSupabaseHistoryRepository(supabase), {
+      projectId,
+      fileId: id,
+      fileName: target?.name ?? '(不明なファイル)',
+      fileKind: target?.kind ?? '',
+      action: 'deleted',
+      version: target?.currentVersion ?? null,
+      before: lastContent,
+      after: '',
+      authorId: user.id,
+      authorName: await readAuthorName(supabase, user.id),
+    })
   } catch {
     return err('UNKNOWN', 'ファイルを削除できませんでした。')
   }

@@ -53,6 +53,7 @@ function makeDeps(overrides: { files?: ProjectFile[] } = {}) {
   const versions: FileVersionRepository = {
     findByVersion: vi.fn(async () => version),
     listByFile: vi.fn(async () => []),
+    deleteOlderThan: vi.fn(async () => {}),
     create: vi.fn(async () => version),
   }
 
