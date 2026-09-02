@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { createDownloadUrlAction, deleteFileAction } from '@/lib/actions/files'
+import { callAction } from '@/lib/client/safe-action'
 import type { ProjectFile } from '@/lib/repositories/files'
 
 export function FileList({
@@ -16,19 +17,26 @@ export function FileList({
   files: ProjectFile[]
 }) {
   const [target, setTarget] = useState<ProjectFile | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   function handleConfirm() {
     if (!target) return
+
+    setMessage(null)
     const formData = new FormData()
     formData.set('projectId', projectId)
     formData.set('id', target.id)
 
     startTransition(async () => {
-      await deleteFileAction(formData)
+      const result = await callAction(() => deleteFileAction(formData))
       setTarget(null)
-      router.refresh()
+
+      // 削除できない理由（ロック付きのタグなど）を必ず伝える。
+      // 結果を見ないと、押しても何も起きない画面になってしまう
+      if (result.ok) router.refresh()
+      else setMessage(result.error.message)
     })
   }
 
@@ -48,6 +56,18 @@ export function FileList({
 
   return (
     <>
+      {message && (
+        <p
+          role="alert"
+          style={{
+            fontSize: '0.85rem',
+            color: 'var(--color-danger)',
+            marginBottom: 8,
+          }}
+        >
+          {message}
+        </p>
+      )}
       <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 8 }}>
         {files.map((file) => (
           <li

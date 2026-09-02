@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { buildStoragePath, normalizeLineEndings, validateUpload } from '@/lib/domain/files'
+import { canDeleteFile, describeLockReason } from '@/lib/domain/tag'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
 import { createSupabaseHistoryRepository } from '@/lib/repositories/history'
+import { createSupabaseTagRepository } from '@/lib/repositories/tags'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { readAuthorName } from '@/lib/usecases/current-author'
 import { recordHistory } from '@/lib/usecases/record-history'
@@ -126,6 +128,17 @@ export async function deleteFileAction(formData: FormData): Promise<Result<null>
   if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
 
   const files = createSupabaseFileRepository(supabase)
+
+  // ロック付きのタグが付いていれば消させない。
+  // 黙って失敗させず、どのタグが止めているかを伝える
+  try {
+    const tags = await createSupabaseTagRepository(supabase).listByFile(id)
+    if (!canDeleteFile(tags)) {
+      return err('FORBIDDEN', describeLockReason(tags))
+    }
+  } catch {
+    return err('UNKNOWN', 'ファイルを削除できませんでした。')
+  }
 
   try {
     // 消してしまうと何を消したのか分からなくなるため、先に読んでおく

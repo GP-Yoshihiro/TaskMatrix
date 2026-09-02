@@ -88,6 +88,7 @@ describe('parseFilter / toSearchParams', () => {
       extension: 'md',
       from: '2026-09-01',
       to: '2026-09-30',
+      tag: '',
     })
   })
 
@@ -110,6 +111,7 @@ describe('parseFilter / toSearchParams', () => {
       extension: 'md',
       from: '2026-09-01',
       to: '2026-09-30',
+      tag: '設計',
     }
 
     expect(parseFilter(toSearchParams(filter))).toEqual(filter)
@@ -121,5 +123,19 @@ describe('parseFilter / toSearchParams', () => {
     expect(params.get('fileName')).toBe('要件')
     expect(params.has('extension')).toBe(false)
     expect(params.has('from')).toBe(false)
+  })
+})
+
+describe('タグの条件', () => {
+  it('タグだけの指定でも空ではない', () => {
+    expect(isEmptyFilter({ ...EMPTY_FILTER, tag: '設計' })).toBe(false)
+  })
+
+  it('問い合わせから読む', () => {
+    expect(parseFilter(new URLSearchParams({ tag: '議事録' })).tag).toBe('議事録')
+  })
+
+  it('空のタグは問い合わせに含めない', () => {
+    expect(toSearchParams({ ...EMPTY_FILTER, fileName: 'a' }).has('tag')).toBe(false)
   })
 })

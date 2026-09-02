@@ -65,6 +65,7 @@ export function HistoryList({
       formData.set('extension', nextFilter.extension)
       formData.set('from', nextFilter.from)
       formData.set('to', nextFilter.to)
+      formData.set('tag', nextFilter.tag)
       if (cursor) {
         formData.set('cursorCreatedAt', cursor.createdAt)
         formData.set('cursorId', cursor.id)

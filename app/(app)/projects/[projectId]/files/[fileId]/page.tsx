@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { MarkdownEditor } from '@/components/app/markdown-editor'
+import { FileTags } from '@/components/app/file-tags'
 import { TaskExtractPanel } from '@/components/app/task-extract-panel'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseFileVersionRepository } from '@/lib/repositories/file-versions'
 import { createSupabaseFileRepository } from '@/lib/repositories/files'
+import { createSupabaseTagRepository } from '@/lib/repositories/tags'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { loadEstimate } from '@/lib/usecases/load-estimate'
 
@@ -27,6 +29,12 @@ export default async function FilePage({
     file.currentVersion,
   )
 
+  const tagRepository = createSupabaseTagRepository(supabase)
+  const [fileTagList, projectTagList] = await Promise.all([
+    tagRepository.listByFile(fileId),
+    tagRepository.listByProject(projectId),
+  ])
+
   const estimate = await loadEstimate(
     createSupabaseAiUsageRepository(supabase),
     'extract_tasks',
@@ -44,6 +52,13 @@ export default async function FilePage({
         </Link>
         <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
       </header>
+
+      <FileTags
+        projectId={projectId}
+        fileId={fileId}
+        tags={fileTagList}
+        available={projectTagList}
+      />
 
       <TaskExtractPanel
         projectId={projectId}

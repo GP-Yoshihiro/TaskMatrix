@@ -176,7 +176,7 @@ describe('HistoryList の絞り込み', () => {
         projectId="p1"
         initialEntries={[]}
         initialHasMore={false}
-        filter={{ fileName: '存在しない', extension: '', from: '', to: '' }}
+        filter={{ fileName: '存在しない', extension: '', from: '', to: '', tag: '' }}
       />,
     )
 
@@ -230,7 +230,7 @@ describe('HistoryList の絞り込み', () => {
         projectId="p1"
         initialEntries={[]}
         initialHasMore={false}
-        filter={{ fileName: '要件', extension: 'md', from: '2026-09-01', to: '2026-09-30' }}
+        filter={{ fileName: '要件', extension: 'md', from: '2026-09-01', to: '2026-09-30', tag: '' }}
       />,
     )
 
