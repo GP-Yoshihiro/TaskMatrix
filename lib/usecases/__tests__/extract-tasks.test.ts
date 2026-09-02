@@ -73,6 +73,7 @@ function makeDeps(): Deps {
   const versions: FileVersionRepository = {
     findByVersion: vi.fn(async () => sampleVersion),
     listByFile: vi.fn(async () => []),
+    deleteOlderThan: vi.fn(async () => {}),
     create: vi.fn(async () => sampleVersion),
   }
 

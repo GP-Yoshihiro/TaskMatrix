@@ -47,6 +47,7 @@ export default async function ProjectDetailPage({
         <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
         <Link href={`/projects/${projectId}/schedule`}>スケジュールへ</Link>
         <Link href={`/projects/${projectId}/chat`}>AI チャットへ</Link>
+        <Link href={`/projects/${projectId}/history`}>変更履歴へ</Link>
       </header>
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>

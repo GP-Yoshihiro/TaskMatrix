@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
+import { validateDisplayName } from '@/lib/domain/profile'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { THEME_COOKIE_NAME, type ThemePreference } from '@/lib/platform/theme'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -33,5 +34,31 @@ export async function updateThemeAction(formData: FormData): Promise<Result<null
   })
 
   revalidatePath('/', 'layout')
+  return ok(null)
+}
+
+/** 履歴の変更者名に使う表示名を保存する */
+export async function updateDisplayNameAction(
+  formData: FormData,
+): Promise<Result<null>> {
+  const value = String(formData.get('displayName') ?? '').trim()
+
+  const message = validateDisplayName(value)
+  if (message) return err('VALIDATION_ERROR', message)
+
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ display_name: value })
+    .eq('id', user.id)
+
+  if (error) return err('UNKNOWN', '表示名を保存できませんでした。')
+
+  revalidatePath('/settings')
   return ok(null)
 }

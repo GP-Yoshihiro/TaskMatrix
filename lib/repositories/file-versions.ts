@@ -24,6 +24,14 @@ export interface FileVersionRepository {
     authorId: string
     note: string
   }): Promise<FileVersion>
+  /**
+   * 指定の版より古い版を捨てる。
+   *
+   * 変更の経緯は履歴（history_entries）が差分として持つため、
+   * 全文を版ごとに持ち続ける必要がない。両方を持つと容量削減にならない。
+   * **必ず履歴を記録したあとに呼ぶこと。**
+   */
+  deleteOlderThan(fileId: string, version: number): Promise<void>
 }
 
 type Row = {
@@ -96,6 +104,15 @@ export function createSupabaseFileVersionRepository(
         .single()
       if (error) throw error
       return toVersion(data as Row)
+    },
+
+    async deleteOlderThan(fileId, version) {
+      const { error } = await supabase
+        .from('file_versions')
+        .delete()
+        .eq('file_id', fileId)
+        .lt('version', version)
+      if (error) throw error
     },
   }
 }
