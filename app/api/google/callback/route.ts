@@ -53,11 +53,17 @@ export async function GET(request: NextRequest) {
     clientSecret: config.clientSecret,
     redirectUri: buildRedirectUri(request.nextUrl.origin),
   })
-  if (!exchanged.ok) return back(request, 'failed')
+  if (!exchanged.ok) {
+    console.error('[google] コード交換に失敗:', exchanged.detail ?? exchanged.failure)
+    return back(request, 'failed')
+  }
 
   // このアプリ専用のカレンダーを作る。既存のカレンダーには触れない
   const calendar = await createCalendar(exchanged.data.accessToken)
-  if (!calendar.ok) return back(request, 'failed')
+  if (!calendar.ok) {
+    console.error('[google] カレンダー作成に失敗:', calendar.detail ?? calendar.failure)
+    return back(request, 'failed')
+  }
 
   try {
     await createSupabaseGoogleConnectionRepository(supabase).save({
@@ -69,7 +75,8 @@ export async function GET(request: NextRequest) {
       ),
       calendarId: calendar.data,
     })
-  } catch {
+  } catch (error) {
+    console.error('[google] 接続の保存に失敗:', (error as Error)?.message)
     return back(request, 'failed')
   }
 

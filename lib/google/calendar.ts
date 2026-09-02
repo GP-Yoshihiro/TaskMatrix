@@ -29,9 +29,17 @@ export type GoogleFailure =
 
 export type GoogleResult<T> =
   | { ok: true; data: T }
-  | { ok: false; failure: GoogleFailure }
+  | { ok: false; failure: GoogleFailure; detail?: string }
 
-const fail = (failure: GoogleFailure): GoogleResult<never> => ({ ok: false, failure })
+/**
+ * detail には Google が返したエラーの説明だけを入れる。
+ * トークン・認可コード・秘密情報は決して入れない。
+ */
+const fail = (failure: GoogleFailure, detail?: string): GoogleResult<never> => ({
+  ok: false,
+  failure,
+  detail,
+})
 
 export function buildAuthUrl(input: {
   clientId: string
@@ -67,13 +75,20 @@ async function postForm(body: URLSearchParams): Promise<GoogleResult<Record<stri
     const json = (await response.json()) as Record<string, unknown>
 
     if (!response.ok) {
+      const detail = `token ${response.status}: ${String(json.error ?? '')} ${String(
+        json.error_description ?? '',
+      )}`.trim()
+
       // 失効は再接続を促す必要があるため区別する
-      return fail(json.error === 'invalid_grant' ? 'reconnect_required' : 'request_failed')
+      return fail(
+        json.error === 'invalid_grant' ? 'reconnect_required' : 'request_failed',
+        detail,
+      )
     }
 
     return { ok: true, data: json }
-  } catch {
-    return fail('request_failed')
+  } catch (error) {
+    return fail('request_failed', `token fetch: ${(error as Error)?.message ?? 'unknown'}`)
   }
 }
 
@@ -98,7 +113,13 @@ export async function exchangeCode(input: {
   const refreshToken = String(result.data.refresh_token ?? '')
 
   // リフレッシュトークンが無いと次回以降つながらない
-  if (!accessToken || !refreshToken) return fail('request_failed')
+  if (!accessToken || !refreshToken) {
+    // access_type=offline と prompt=consent を付けても返らないことがある
+    return fail(
+      'request_failed',
+      `exchange missing token (access:${Boolean(accessToken)} refresh:${Boolean(refreshToken)})`,
+    )
+  }
 
   return { ok: true, data: { accessToken, refreshToken } }
 }
@@ -148,13 +169,23 @@ async function callApi(
     // 差分同期の印が古くなった
     if (response.status === 410) return fail('sync_token_expired')
 
-    if (response.status === 401) return fail('reconnect_required')
+    if (response.status === 401) return fail('reconnect_required', 'api 401')
 
-    if (!response.ok) return fail('request_failed')
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: { message?: string; errors?: { reason?: string }[] }
+      }
+      const reason = body.error?.errors?.[0]?.reason ?? ''
+      const detail = `api ${response.status} ${path.split('?')[0]}: ${reason} ${
+        body.error?.message ?? ''
+      }`.trim()
+
+      return fail('request_failed', detail)
+    }
 
     return { ok: true, data: (await response.json()) as Record<string, unknown> }
-  } catch {
-    return fail('request_failed')
+  } catch (error) {
+    return fail('request_failed', `api fetch: ${(error as Error)?.message ?? 'unknown'}`)
   }
 }
 
@@ -169,7 +200,7 @@ export async function createCalendar(
   if (!result.ok) return result
 
   const id = String(result.data.id ?? '')
-  return id ? { ok: true, data: id } : fail('request_failed')
+  return id ? { ok: true, data: id } : fail('request_failed', 'calendar id missing')
 }
 
 export async function insertEvent(
