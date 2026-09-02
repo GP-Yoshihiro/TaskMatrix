@@ -52,6 +52,10 @@ function makeDeps(overrides: {
   const scheduleRepo: ScheduleRepository = {
     listByProject: vi.fn(async () => []),
     createMany: vi.fn(async () => 0),
+    listUnsynced: vi.fn(async () => []),
+    setGoogleEventId: vi.fn(async () => {}),
+    findByGoogleEventIds: vi.fn(async () => []),
+    updateTimes: vi.fn(async () => {}),
     remove: vi.fn(async () => {}),
   }
 
