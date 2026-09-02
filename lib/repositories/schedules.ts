@@ -25,6 +25,16 @@ export type ScheduleInput = {
 export interface ScheduleRepository {
   listByProject(projectId: string): Promise<Schedule[]>
   createMany(inputs: ScheduleInput[]): Promise<number>
+  /** Google へまだ反映していない予定 */
+  listUnsynced(projectId: string): Promise<
+    { id: string; taskTitle: string; reason: string; startsAt: string; endsAt: string }[]
+  >
+  setGoogleEventId(id: string, googleEventId: string): Promise<void>
+  /** Google の予定 ID から引く。取り込みで使う */
+  findByGoogleEventIds(
+    ids: string[],
+  ): Promise<{ id: string; googleEventId: string; startsAt: string; endsAt: string }[]>
+  updateTimes(id: string, input: { startsAt: string; endsAt: string }): Promise<void>
   remove(id: string): Promise<void>
 }
 
@@ -85,6 +95,72 @@ export function createSupabaseScheduleRepository(
       )
       if (error) throw error
       return count ?? inputs.length
+    },
+
+    async listUnsynced(projectId) {
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('id, starts_at, ends_at, reason, tasks(title)')
+        .eq('project_id', projectId)
+        .is('google_event_id', null)
+        .order('starts_at')
+      if (error) throw error
+
+      return ((data ?? []) as unknown as {
+        id: string
+        starts_at: string
+        ends_at: string
+        reason: string
+        tasks: { title: string } | null
+      }[]).map((row) => ({
+        id: row.id,
+        taskTitle: row.tasks?.title ?? '(削除されたタスク)',
+        reason: row.reason,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+      }))
+    },
+
+    async setGoogleEventId(id, googleEventId) {
+      const { error } = await supabase
+        .from('schedules')
+        .update({ google_event_id: googleEventId })
+        .eq('id', id)
+      if (error) throw error
+    },
+
+    async findByGoogleEventIds(ids) {
+      if (ids.length === 0) return []
+
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('id, google_event_id, starts_at, ends_at')
+        .in('google_event_id', ids)
+      if (error) throw error
+
+      return ((data ?? []) as {
+        id: string
+        google_event_id: string
+        starts_at: string
+        ends_at: string
+      }[]).map((row) => ({
+        id: row.id,
+        googleEventId: row.google_event_id,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+      }))
+    },
+
+    async updateTimes(id, input) {
+      const { error } = await supabase
+        .from('schedules')
+        .update({
+          starts_at: input.startsAt,
+          ends_at: input.endsAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw error
     },
 
     async remove(id) {

@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { GoogleCalendarPanel } from '@/components/app/google-calendar-panel'
 import { SchedulePlanner } from '@/components/app/schedule-planner'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
+import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/google-connections'
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
@@ -14,10 +16,13 @@ export const maxDuration = 120
 
 export default async function SchedulePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ projectId: string }>
+  searchParams: Promise<{ google?: string }>
 }) {
   const { projectId } = await params
+  const { google } = await searchParams
   const supabase = await createServerSupabaseClient()
 
   const { data: project } = await supabase
@@ -47,6 +52,11 @@ export default async function SchedulePage({
     'plan_schedule',
   )
 
+  const connection = user
+    ? await createSupabaseGoogleConnectionRepository(supabase).find(user.id)
+    : null
+  const unsynced = await createSupabaseScheduleRepository(supabase).listUnsynced(projectId)
+
   return (
     <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
       <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -60,6 +70,18 @@ export default async function SchedulePage({
         pendingTaskCount={pendingTaskCount}
         settings={settings}
         estimate={estimate}
+      />
+      <GoogleCalendarPanel
+        projectId={projectId}
+        connected={connection !== null}
+        configured={Boolean(
+          process.env.GOOGLE_CLIENT_ID &&
+            process.env.GOOGLE_CLIENT_SECRET &&
+            process.env.GOOGLE_TOKEN_ENCRYPTION_KEY,
+        )}
+        lastSyncedAt={connection?.lastSyncedAt ?? null}
+        unsyncedCount={unsynced.length}
+        result={google ?? null}
       />
     </div>
   )

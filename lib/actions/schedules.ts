@@ -6,6 +6,7 @@ import { isTaskWeight } from '@/lib/domain/schedule'
 import type { WithUsage } from '@/lib/domain/usage'
 import { createGeminiSchedulePlanner } from '@/lib/gemini/plan-schedule-client'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
+import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/google-connections'
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
@@ -15,6 +16,8 @@ import {
   type ScheduleDraft,
   planScheduleForProject,
 } from '@/lib/usecases/plan-schedule'
+import { openGoogleSession } from '@/lib/usecases/google-session'
+import { pushSchedules } from '@/lib/usecases/push-schedules'
 import { trackUsage } from '@/lib/usecases/track-usage'
 
 /** その日のうちにブラウザ側で使うため、稼働条件のタイムゾーンで今日の日付を作る */
@@ -112,6 +115,25 @@ export async function confirmSchedulesAction(formData: FormData): Promise<Result
         createdBy: user.id,
       })),
     )
+
+    // Google と連携していれば書き出す。
+    // 失敗しても確定は成功として返す。連携の不調で予定を確定できなくなるのは
+    // 本末転倒であり、取りこぼしは次回の書き出しで拾われる。
+    try {
+      const session = await openGoogleSession(
+        createSupabaseGoogleConnectionRepository(supabase),
+        user.id,
+      )
+      if (session.ok) {
+        await pushSchedules(
+          createSupabaseScheduleRepository(supabase),
+          session.data,
+          projectId,
+        )
+      }
+    } catch {
+      // 書き出しの失敗は確定の可否に影響させない
+    }
 
     revalidatePath(`/projects/${projectId}/schedule`)
     return ok(count)
