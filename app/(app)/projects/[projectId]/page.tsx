@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { ApiTokenPanel } from '@/components/app/api-token-panel'
 import { FileList } from '@/components/app/file-list'
 import { FileUploadForm } from '@/components/app/file-upload-form'
@@ -41,14 +41,13 @@ export default async function ProjectDetailPage({
   const protocol = host.startsWith('localhost') ? 'http' : 'https'
 
   return (
-    <div style={{ display: 'grid', gap: 32, maxWidth: 900 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name}</h1>
-        <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
-        <Link href={`/projects/${projectId}/schedule`}>スケジュールへ</Link>
-        <Link href={`/projects/${projectId}/chat`}>AI チャットへ</Link>
-        <Link href={`/projects/${projectId}/history`}>変更履歴へ</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project.name}
+        title={project.name}
+        description="このプロジェクトのフォルダとファイルです。左の一覧から他の画面へ移れます。"
+      />
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>
         <h2 style={{ fontWeight: 600 }}>ファイル</h2>

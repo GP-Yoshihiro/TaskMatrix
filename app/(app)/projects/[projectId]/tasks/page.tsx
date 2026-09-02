@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { TaskManager } from '@/components/app/task-manager'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -23,13 +23,14 @@ export default async function TasksPage({
   const tasks = await createSupabaseTaskRepository(supabase).listByProject(projectId)
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name} のタスク</h1>
-        <Link href={`/projects/${projectId}/schedule`}>スケジュールへ</Link>
-        <Link href={`/projects/${projectId}/chat`}>AI チャットへ</Link>
-        <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project.name}
+        pageLabel="タスク"
+        title="タスク"
+        description="AI が抽出したタスクと、手で追加したタスクの一覧です。"
+      />
       <TaskManager projectId={projectId} tasks={tasks} />
     </div>
   )

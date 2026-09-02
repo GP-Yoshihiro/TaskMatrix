@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { GoogleCalendarPanel } from '@/components/app/google-calendar-panel'
 import { SchedulePlanner } from '@/components/app/schedule-planner'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
@@ -58,12 +58,14 @@ export default async function SchedulePage({
   const unsynced = await createSupabaseScheduleRepository(supabase).listUnsynced(projectId)
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name} のスケジュール</h1>
-        <Link href={`/projects/${projectId}/tasks`}>タスク一覧へ</Link>
-        <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project.name}
+        pageLabel="予定"
+        title="スケジュール"
+        description="未完了のタスクから予定を算出し、確定するとカレンダーに反映されます。"
+      />
       <SchedulePlanner
         projectId={projectId}
         confirmed={confirmed}

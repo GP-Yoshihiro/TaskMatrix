@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { MarkdownEditor } from '@/components/app/markdown-editor'
 import { FileTags } from '@/components/app/file-tags'
 import { TaskExtractPanel } from '@/components/app/task-extract-panel'
@@ -29,6 +30,13 @@ export default async function FilePage({
     file.currentVersion,
   )
 
+  // パンくずにプロジェクト名を出すため、名前だけ引く
+  const { data: project } = await supabase
+    .from('projects')
+    .select('name')
+    .eq('id', projectId)
+    .maybeSingle()
+
   const tagRepository = createSupabaseTagRepository(supabase)
   const [fileTagList, projectTagList] = await Promise.all([
     tagRepository.listByFile(fileId),
@@ -41,17 +49,22 @@ export default async function FilePage({
   )
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: 1100 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 600 }}>{file.name}</h1>
-        {/* このファイルで絞り込んだ状態で履歴を開く */}
-        <Link
-          href={`/projects/${projectId}/history?fileName=${encodeURIComponent(file.name)}`}
-        >
-          変更履歴
-        </Link>
-        <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project?.name ?? null}
+        pageLabel={file.name}
+        title={file.name}
+        actions={
+          /* このファイルで絞り込んだ状態で履歴を開く */
+          <Link
+            href={`/projects/${projectId}/history?fileName=${encodeURIComponent(file.name)}`}
+            style={{ fontSize: '0.85rem' }}
+          >
+            このファイルの変更履歴
+          </Link>
+        }
+      />
 
       <FileTags
         projectId={projectId}

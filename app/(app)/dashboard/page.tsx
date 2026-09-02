@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -32,8 +33,8 @@ export default async function DashboardPage() {
   const files = (recentFiles ?? []) as unknown as RecentFile[]
 
   return (
-    <div style={{ display: 'grid', gap: 24, maxWidth: 900 }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>ホーム</h1>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader title="ホーム" description="最近の動きと、プロジェクトの数です。" />
 
       <Card style={{ display: 'grid', gap: 4 }}>
         <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.85rem' }}>プロジェクト</span>

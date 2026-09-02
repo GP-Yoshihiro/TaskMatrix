@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { HistoryView } from '@/components/app/history-view'
 import { HISTORY_PAGE_SIZE } from '@/lib/domain/history'
 import { parseFilter } from '@/lib/domain/history-filter'
@@ -69,17 +69,14 @@ export default async function HistoryPage({
   ])
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: 1400 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name} の変更履歴</h1>
-        <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
-      </header>
-
-      <p style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>
-        プロジェクト内のすべてのファイルの変更を表示しています。
-        下までスクロールすると続きを読み込みます。
-        「編集」を押すと、右側に変更箇所が出ます。
-      </p>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project.name}
+        pageLabel="変更履歴"
+        title="変更履歴"
+        description="プロジェクト内のすべてのファイルの変更です。下までスクロールすると続きを読み込みます。「編集」を押すと右側に変更箇所が出ます。"
+      />
 
       <HistoryView
         projectId={projectId}
