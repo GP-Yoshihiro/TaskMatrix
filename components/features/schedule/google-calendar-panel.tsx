@@ -50,9 +50,12 @@ export function GoogleCalendarPanel({
   lastSyncedAt,
   unsyncedCount,
   result,
+  needsReconnect,
 }: {
   projectId: string
   connected: boolean
+  /** 失効を検知済みか。立っている間は繋ぎ直すまで同期できない */
+  needsReconnect: boolean
   /** 環境変数が揃っているか */
   configured: boolean
   lastSyncedAt: string | null
@@ -152,6 +155,39 @@ export function GoogleCalendarPanel({
               }}
             >
               Google カレンダーと連携
+            </a>
+          </div>
+        </>
+      ) : needsReconnect ? (
+        /*
+         * 失効を検知している。
+         * 押しても必ず失敗するため、同期の操作は出さずに繋ぎ直しへ誘導する。
+         */
+        <>
+          <p role="alert" style={{ fontSize: '0.9rem', color: 'var(--color-danger)' }}>
+            <strong>Google との接続が切れています。</strong>
+          </p>
+          <p style={{ fontSize: '0.82rem', ...muted }}>
+            連携し直すまで、予定の書き出しと取り込みは行われません。
+            Google Cloud の公開ステータスが「テスト」の間は、
+            接続が 7 日で切れる仕様です。
+          </p>
+          <div>
+            <a
+              href={`/api/google/connect?from=${encodeURIComponent(
+                `/projects/${projectId}/schedule`,
+              )}`}
+              style={{
+                display: 'inline-block',
+                padding: '8px 14px',
+                borderRadius: 8,
+                background: 'var(--color-accent)',
+                color: 'var(--color-accent-fg)',
+                fontSize: '0.9rem',
+                textDecoration: 'none',
+              }}
+            >
+              連携し直す
             </a>
           </div>
         </>
