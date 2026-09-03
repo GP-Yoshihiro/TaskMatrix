@@ -21,7 +21,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('theme, email, display_name')
+    .select('theme, email, display_name, is_admin')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -76,6 +76,15 @@ export default async function SettingsPage() {
         </p>
         <Link href="/settings/usage">使用量の履歴を見る</Link>
       </section>
+      {profile?.is_admin && (
+        <section style={{ display: 'grid', gap: 8 }}>
+          <h2 className="tm-h2">招待コード</h2>
+          <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+            登録できる人を、コードを渡した相手だけに限ります。
+          </p>
+          <Link href="/settings/invitations">招待コードを発行する</Link>
+        </section>
+      )}
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 className="tm-h2">稼働条件</h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
