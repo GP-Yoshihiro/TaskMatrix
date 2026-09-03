@@ -16,8 +16,8 @@ export const metadata: Metadata = {
   description: 'TaskMatrix が取り扱う情報と、その送信先についての説明です。',
 }
 
-/** 問い合わせ先。運用者が自身の連絡先に置き換える */
-const CONTACT = '（連絡先メールアドレスを記入してください）'
+/** 問い合わせ先 */
+const CONTACT = 'yoshi.lb.ex@gmail.com'
 
 const LAST_UPDATED = '2026-09-03'
 
