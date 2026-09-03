@@ -1,12 +1,26 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { decideProtectedRouteAction, isConnectivityFailure } from '@/lib/domain/auth'
 
 /** 保護対象のパス接頭辞 */
 const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/settings']
 
-/** セッションを更新し、未認証なら保護ルートからログイン画面へ退避させる */
+/**
+ * セッションを更新し、未認証なら保護ルートからログイン画面へ退避させる。
+ *
+ * **どんな理由であれ、ここで例外を外に出さない。**
+ * proxy はほぼ全ての要求を通るため、投げると静的ファイルまで 500 になり、
+ * 何が起きているのかを確かめる手段まで失われる。
+ */
 export async function updateSession(request: NextRequest) {
+  try {
+    return await handle(request)
+  } catch {
+    // セッションの更新だけを諦めて通す。原因は /api/health で確かめられる
+    return NextResponse.next({ request })
+  }
+}
+
+async function handle(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -20,6 +34,14 @@ export async function updateSession(request: NextRequest) {
    * セッションの更新だけを諦めて通し、原因は /api/health で確かめられるようにする。
    */
   if (!url || !anonKey) return response
+
+  /*
+   * 読み込みを関数の中で行う。
+   *
+   * 先頭で読み込むと、その読み込み自体が失敗したときに
+   * 下の try/catch では捕まえられず、proxy を通る全経路が 500 になる。
+   */
+  const { createServerClient } = await import('@supabase/ssr')
 
   const supabase = createServerClient(
     url,
