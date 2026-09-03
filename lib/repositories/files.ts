@@ -67,6 +67,11 @@ function toFile(row: Row): ProjectFile {
   }
 }
 
+/**
+ * プロジェクト内のファイル。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseFileRepository(supabase: SupabaseClient): FileRepository {
   return {
     async listByProject(projectId) {

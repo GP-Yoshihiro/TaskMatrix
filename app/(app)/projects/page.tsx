@@ -1,6 +1,6 @@
 import { PageHeader } from '@/components/layout/page-header'
-import { ProjectCreateForm } from '@/components/app/project-create-form'
-import { ProjectList } from '@/components/app/project-list'
+import { ProjectCreateForm } from '@/components/features/projects/project-create-form'
+import { ProjectList } from '@/components/features/projects/project-list'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
 import { createSupabaseProjectRepository } from '@/lib/repositories/projects'
 import { createServerSupabaseClient } from '@/lib/supabase/server'

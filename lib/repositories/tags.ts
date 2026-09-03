@@ -14,6 +14,11 @@ export interface TagRepository {
 
 type TagRow = { id: string; name: string; locked: boolean }
 
+/**
+ * タグと、その付与。ロック付きはファイルの削除を防ぐ。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseTagRepository(supabase: SupabaseClient): TagRepository {
   return {
     async listByProject(projectId) {

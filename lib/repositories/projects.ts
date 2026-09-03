@@ -38,6 +38,11 @@ function toProject(row: Row): Project {
   }
 }
 
+/**
+ * プロジェクト。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseProjectRepository(
   supabase: SupabaseClient,
 ): ProjectRepository {

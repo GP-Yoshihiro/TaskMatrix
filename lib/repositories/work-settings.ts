@@ -19,6 +19,11 @@ function toHhMm(value: string): string {
   return value.slice(0, 5)
 }
 
+/**
+ * 稼働条件（稼働日・時間帯・1 日の上限）。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseWorkSettingsRepository(
   supabase: SupabaseClient,
 ): WorkSettingsRepository {

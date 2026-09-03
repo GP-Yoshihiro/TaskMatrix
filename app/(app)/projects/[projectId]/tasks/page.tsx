@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
-import { TaskManager } from '@/components/app/task-manager'
+import { TaskManager } from '@/components/features/tasks/task-manager'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 

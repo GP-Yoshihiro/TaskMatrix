@@ -65,6 +65,12 @@ function NavLink({
   )
 }
 
+/**
+ * 移動先の一覧。
+ *
+ * 現在地をハイライトし、プロジェクトを開いている間はその項目も出す。
+ * 上部からは一覧へ戻らずにプロジェクトを切り替えられる。
+ */
 export function Sidebar({
   pathname,
   projectId,

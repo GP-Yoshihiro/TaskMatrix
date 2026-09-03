@@ -18,6 +18,11 @@ export interface ExtractionRunRepository {
   fail(input: { runId: string; errorMessage: string }): Promise<void>
 }
 
+/**
+ * AI タスク抽出の実行記録。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseExtractionRunRepository(
   supabase: SupabaseClient,
 ): ExtractionRunRepository {

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
-import { RagChat } from '@/components/app/rag-chat'
+import { RagChat } from '@/components/features/chat/rag-chat'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseChatRepository } from '@/lib/repositories/chat'
 import { createSupabaseFileChunkRepository } from '@/lib/repositories/file-chunks'

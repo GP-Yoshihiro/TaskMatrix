@@ -65,6 +65,11 @@ function toSchedule(row: Row): Schedule {
   }
 }
 
+/**
+ * 確定した予定。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseScheduleRepository(
   supabase: SupabaseClient,
 ): ScheduleRepository {

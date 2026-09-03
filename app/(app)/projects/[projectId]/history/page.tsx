@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
-import { HistoryView } from '@/components/app/history-view'
+import { HistoryView } from '@/components/features/history/history-view'
 import { HISTORY_PAGE_SIZE } from '@/lib/domain/history'
 import { parseFilter } from '@/lib/domain/history-filter'
 import { createSupabaseHistoryRepository } from '@/lib/repositories/history'

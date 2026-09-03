@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { OverlapWarningDialog } from '@/components/app/overlap-warning-dialog'
+import { OverlapWarningDialog } from '@/components/features/schedule/overlap-warning-dialog'
 
 const pairs = [
   {

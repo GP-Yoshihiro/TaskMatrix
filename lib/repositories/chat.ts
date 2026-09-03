@@ -34,6 +34,11 @@ type MessageRow = {
   created_at: string
 }
 
+/**
+ * RAG チャットの会話と、回答の根拠。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseChatRepository(supabase: SupabaseClient): ChatRepository {
   return {
     /** プロジェクトごとに 1 つの会話を使う。無ければ作る */

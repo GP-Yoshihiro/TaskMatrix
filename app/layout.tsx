@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { cookies, headers } from 'next/headers'
 import type { ReactNode } from 'react'
-import { ServiceWorkerRegister } from '@/components/app/service-worker-register'
+import { ServiceWorkerRegister } from '@/components/features/pwa/service-worker-register'
 import {
   THEME_COOKIE_NAME,
   type ThemePreference,
