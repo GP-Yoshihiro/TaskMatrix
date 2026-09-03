@@ -166,7 +166,7 @@ describe('HistoryList の絞り込み', () => {
   it('条件が無いときは「まだ」と伝える', () => {
     render(<HistoryList projectId="p1" initialEntries={[]} initialHasMore={false} />)
 
-    expect(screen.getByText('まだ変更履歴がありません。')).toBeInTheDocument()
+    expect(screen.getByText('まだ変更履歴がありません')).toBeInTheDocument()
   })
 
   it('条件があるときは条件に合わないと伝える', () => {
@@ -180,7 +180,7 @@ describe('HistoryList の絞り込み', () => {
       />,
     )
 
-    expect(screen.getByText('条件に合う変更履歴がありません。')).toBeInTheDocument()
+    expect(screen.getByText('条件に合う変更履歴がありません')).toBeInTheDocument()
   })
 
   it('編集を押すと選ばれた行を伝える', () => {
@@ -241,5 +241,29 @@ describe('HistoryList の絞り込み', () => {
     expect(formData.get('extension')).toBe('md')
     expect(formData.get('from')).toBe('2026-09-01')
     expect(formData.get('to')).toBe('2026-09-30')
+  })
+})
+
+describe('HistoryList の空状態', () => {
+  it('次に何をすればよいかまで伝える', () => {
+    // 「ありません」だけだと、何をすれば埋まるのか分からない
+    render(<HistoryList projectId="p1" initialEntries={[]} initialHasMore={false} />)
+
+    expect(
+      screen.getByText('ファイルを追加・編集・削除すると、ここに記録されます。'),
+    ).toBeInTheDocument()
+  })
+
+  it('絞り込みで空のときは条件の外し方を案内する', () => {
+    render(
+      <HistoryList
+        projectId="p1"
+        initialEntries={[]}
+        initialHasMore={false}
+        filter={{ fileName: 'x', extension: '', from: '', to: '', tag: '' }}
+      />,
+    )
+
+    expect(screen.getByText(/条件を緩める/)).toBeInTheDocument()
   })
 })

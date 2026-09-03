@@ -115,7 +115,7 @@ export function RagChat({
     <div style={{ display: 'grid', gap: 16 }}>
       <section style={{ display: 'grid', gap: 8 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <h2 style={{ fontWeight: 600 }}>検索用データ</h2>
+          <h2 className="tm-h2">検索用データ</h2>
           <Button size="sm" variant="secondary" onClick={handleBuildIndex} disabled={isPending}>
             {running === 'build_index' ? '処理中…' : '検索用データを作成'}
           </Button>

@@ -45,7 +45,7 @@ export default async function DashboardPage() {
       </Card>
 
       <section style={{ display: 'grid', gap: 12 }}>
-        <h2 style={{ fontWeight: 600 }}>最近の更新</h2>
+        <h2 className="tm-h2">最近の更新</h2>
         {files.length === 0 ? (
           <p style={{ color: 'var(--color-fg-muted)' }}>更新されたファイルはまだありません。</p>
         ) : (

@@ -50,7 +50,7 @@ export default async function ProjectDetailPage({
       />
       <FolderTree projectId={projectId} tree={buildFolderTree(folderRows)} />
       <section style={{ display: 'grid', gap: 12 }}>
-        <h2 style={{ fontWeight: 600 }}>ファイル</h2>
+        <h2 className="tm-h2">ファイル</h2>
         <MarkdownCreateForm projectId={projectId} />
         <FileUploadForm projectId={projectId} folderId={null} />
         <FileList projectId={projectId} files={files} />

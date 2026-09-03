@@ -116,7 +116,7 @@ export function GoogleCalendarPanel({
 
   return (
     <section style={{ display: 'grid', gap: 10 }}>
-      <h2 style={{ fontWeight: 600 }}>Google カレンダー連携</h2>
+      <h2 className="tm-h2">Google カレンダー連携</h2>
 
       {!configured ? (
         <p role="alert" style={{ fontSize: '0.85rem', color: 'var(--color-danger)' }}>

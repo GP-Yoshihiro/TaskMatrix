@@ -44,23 +44,23 @@ export default async function SettingsPage() {
     <div style={{ display: 'grid', gap: 24, maxWidth: 680 }}>
       <PageHeader title="設定" description="表示名・テーマ・稼働条件と、使用量の確認です。" />
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2 style={{ fontWeight: 600 }}>アカウント</h2>
+        <h2 className="tm-h2">アカウント</h2>
         <p style={{ color: 'var(--color-fg-muted)' }}>{profile?.email}</p>
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2 style={{ fontWeight: 600 }}>表示名</h2>
+        <h2 className="tm-h2">表示名</h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
           変更履歴に表示される名前です。未登録のときはメールアドレスの @ より前を使います。
         </p>
         <DisplayNameForm current={profile?.display_name ?? ''} />
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2 style={{ fontWeight: 600 }}>表示テーマ</h2>
+        <h2 className="tm-h2">表示テーマ</h2>
         <ThemeSwitcher current={current} />
       </section>
       {usage && (
         <section style={{ display: 'grid', gap: 8 }}>
-          <h2 style={{ fontWeight: 600 }}>データベースの使用量</h2>
+          <h2 className="tm-h2">データベースの使用量</h2>
           <p style={{ fontSize: '0.95rem' }}>{usage}</p>
           <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
             変更履歴は期限では消えません。上限に近づいたときだけ、
@@ -69,14 +69,14 @@ export default async function SettingsPage() {
         </section>
       )}
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2 style={{ fontWeight: 600 }}>AI の使用量</h2>
+        <h2 className="tm-h2">AI の使用量</h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
           これまでに使ったトークン量と、処理にかかった時間を確認できます。
         </p>
         <Link href="/settings/usage">使用量の履歴を見る</Link>
       </section>
       <section style={{ display: 'grid', gap: 8 }}>
-        <h2 style={{ fontWeight: 600 }}>稼働条件</h2>
+        <h2 className="tm-h2">稼働条件</h2>
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
           AI がスケジュールを算出する際に、この条件の範囲内に予定を割り当てます。
         </p>

@@ -68,7 +68,7 @@ export function FileTags({
 
   return (
     <section style={{ display: 'grid', gap: 8 }}>
-      <h2 style={{ fontWeight: 600, fontSize: '1rem' }}>タグ</h2>
+      <h2 className="tm-h2">タグ</h2>
 
       {tags.length === 0 ? (
         <p style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>

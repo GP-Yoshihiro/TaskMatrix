@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 import { deleteProjectAction } from '@/lib/actions/projects'
 import type { Project } from '@/lib/repositories/projects'
 
@@ -28,9 +29,11 @@ export function ProjectList({ projects }: { projects: Project[] }) {
 
   if (projects.length === 0) {
     return (
-      <p style={{ color: 'var(--color-fg-muted)' }}>
-        プロジェクトがまだありません。上の入力欄から作成してください。
-      </p>
+      <EmptyState
+        icon="📁"
+        title="プロジェクトがまだありません"
+        description="上の入力欄から作成できます。プロジェクトごとにファイル・タスク・予定・履歴がまとまります。"
+      />
     )
   }
 
@@ -47,7 +50,7 @@ export function ProjectList({ projects }: { projects: Project[] }) {
       >
         {projects.map((project) => (
           <li key={project.id}>
-            <Card style={{ display: 'grid', gap: 8 }}>
+            <Card interactive style={{ display: 'grid', gap: 8 }}>
               <Link
                 href={`/projects/${project.id}`}
                 style={{ fontWeight: 600, fontSize: '1.05rem', padding: '2px 0' }}

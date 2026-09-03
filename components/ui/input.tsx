@@ -1,9 +1,18 @@
 import type { InputHTMLAttributes } from 'react'
 
-export function Input({ style, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+/**
+ * 入力欄。
+ * ホバー・フォーカス・無効の見え方は `.tm-input`（CSS）が持つ。
+ */
+export function Input({
+  style,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
+      className={className ? `tm-input ${className}` : 'tm-input'}
       style={{
         background: 'var(--color-bg)',
         color: 'var(--color-fg)',
