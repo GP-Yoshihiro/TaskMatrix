@@ -30,6 +30,11 @@ type Row = {
   last_synced_at: string | null
 }
 
+/**
+ * Google 連携。リフレッシュトークンは暗号化して保存する。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseGoogleConnectionRepository(
   supabase: SupabaseClient,
 ): GoogleConnectionRepository {

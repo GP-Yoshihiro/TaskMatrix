@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { type ReactNode, useCallback, useState, useSyncExternalStore } from 'react'
 import { type SidebarProject, Sidebar } from '@/components/layout/sidebar'
-import { LogoutButton } from '@/components/app/logout-button'
+import { LogoutButton } from '@/components/features/auth/logout-button'
 import { projectIdFromPath } from '@/lib/domain/navigation'
 import {
   getServerSnapshot,

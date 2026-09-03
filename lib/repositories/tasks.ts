@@ -92,6 +92,11 @@ function toTask(row: Row): Task {
   }
 }
 
+/**
+ * タスク。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepository {
   return {
     async listByProject(projectId) {

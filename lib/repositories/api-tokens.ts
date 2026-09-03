@@ -54,6 +54,11 @@ function toToken(row: Row): ApiToken {
   }
 }
 
+/**
+ * 連携トークン。ハッシュのみを保存し、平文は持たない。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseApiTokenRepository(
   supabase: SupabaseClient,
 ): ApiTokenRepository {

@@ -13,6 +13,11 @@ export interface FolderRepository {
 
 type Row = { id: string; name: string; parent_id: string | null }
 
+/**
+ * ファイルを整理するフォルダ（入れ子になる）。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseFolderRepository(
   supabase: SupabaseClient,
 ): FolderRepository {

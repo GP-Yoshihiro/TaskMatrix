@@ -29,6 +29,11 @@ export interface FileChunkRepository {
   }): Promise<MatchedChunk[]>
 }
 
+/**
+ * 検索用に分割した本文と、その埋め込み。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseFileChunkRepository(
   supabase: SupabaseClient,
 ): FileChunkRepository {

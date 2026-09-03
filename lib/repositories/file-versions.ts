@@ -63,6 +63,11 @@ function toVersion(row: Row): FileVersion {
   }
 }
 
+/**
+ * ファイルの版。履歴に差分を残したあと、過去版は捨てる。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseFileVersionRepository(
   supabase: SupabaseClient,
 ): FileVersionRepository {

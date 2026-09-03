@@ -100,6 +100,11 @@ function toEntry(row: Row): HistoryEntry {
   }
 }
 
+/**
+ * 変更履歴。ファイルを消しても残るよう、外部キーを張らない。
+ *
+ * 行レベルセキュリティにより、自分のデータだけが見える。
+ */
 export function createSupabaseHistoryRepository(
   supabase: SupabaseClient,
 ): HistoryRepository {
