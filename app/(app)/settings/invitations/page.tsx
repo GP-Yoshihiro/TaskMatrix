@@ -3,6 +3,7 @@ import { InvitationPanel } from '@/components/features/settings/invitation-panel
 import { PageHeader } from '@/components/layout/page-header'
 import { createSupabaseInvitationRepository } from '@/lib/repositories/invitations'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { revealInvitations } from '@/lib/usecases/reveal-invitations'
 
 /**
  * 招待コードの発行画面。管理者のみ。
@@ -26,7 +27,10 @@ export default async function InvitationsPage() {
 
   if (!profile?.is_admin) notFound()
 
-  const invitations = await createSupabaseInvitationRepository(supabase).listByCreator(user.id)
+  const stored = await createSupabaseInvitationRepository(supabase).listByCreator(user.id)
+
+  // 暗号化した本体は画面へ渡さない。復号した結果だけを渡す
+  const invitations = revealInvitations(stored, process.env.GOOGLE_TOKEN_ENCRYPTION_KEY)
 
   return (
     <div style={{ display: 'grid', gap: 24, maxWidth: 680 }}>

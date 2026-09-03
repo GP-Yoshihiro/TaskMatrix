@@ -2,6 +2,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
+import { encryptSecret } from '@/lib/domain/crypto'
 import {
   DEFAULT_EXPIRY_DAYS,
   buildCode,
@@ -57,10 +58,17 @@ export async function issueInvitationAction(
 
   const code = buildCode(randomBytes(CODE_BYTES))
 
+  // 読み返せるように暗号化して持つ。鍵はデータベースの外に置く
+  const key = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY
+  if (!key) {
+    return err('SERVICE_NOT_CONFIGURED', 'サーバーの設定が不足しているため発行できません。')
+  }
+
   try {
     const supabase = await createServerSupabaseClient()
     await createSupabaseInvitationRepository(supabase).create({
       codeHash: hashCode(code),
+      codeEncrypted: encryptSecret(code, key),
       displayPrefix: displayPrefix(code),
       note,
       createdBy: admin.data.userId,
