@@ -79,7 +79,7 @@ export default async function UsagePage() {
       </Card>
 
       <section style={{ display: 'grid', gap: 10 }}>
-        <h2 style={{ fontWeight: 600 }}>今月の合計</h2>
+        <h2 className="tm-h2">今月の合計</h2>
         {monthly.truncated && (
           <p style={{ fontSize: '0.8rem', color: 'var(--color-danger)' }}>
             記録が {formatTokens(MONTHLY_ROW_CAP)} 件を超えたため、
@@ -113,7 +113,7 @@ export default async function UsagePage() {
       </section>
 
       <section style={{ display: 'grid', gap: 10 }}>
-        <h2 style={{ fontWeight: 600 }}>機能別の内訳（今月）</h2>
+        <h2 className="tm-h2">機能別の内訳（今月）</h2>
         {breakdown.length === 0 ? (
           <p style={{ fontSize: '0.85rem', ...muted }}>今月はまだ AI を使っていません。</p>
         ) : (
@@ -143,7 +143,7 @@ export default async function UsagePage() {
       </section>
 
       <section style={{ display: 'grid', gap: 10 }}>
-        <h2 style={{ fontWeight: 600 }}>直近 {RECENT_LIMIT} 件</h2>
+        <h2 className="tm-h2">直近 {RECENT_LIMIT} 件</h2>
         {recent.length === 0 ? (
           <p style={{ fontSize: '0.85rem', ...muted }}>記録がありません。</p>
         ) : (

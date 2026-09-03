@@ -42,18 +42,26 @@ const SIZE_STYLE: Record<Size, CSSProperties> = {
   },
 }
 
-/** すべての見た目をデザイントークン経由で決めるボタン */
-export function Button({ variant = 'primary', size = 'md', style, ...props }: Props) {
+/**
+ * すべての見た目をデザイントークン経由で決めるボタン。
+ *
+ * ホバー・押下・無効・キーボードの枠は `.tm-button`（CSS）が持つ。
+ * インラインの style では書けないうえ、描画のたびに作り直さずに済む。
+ */
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  style,
+  className,
+  ...props
+}: Props) {
   return (
     <button
       {...props}
+      className={className ? `tm-button ${className}` : 'tm-button'}
       style={{
         ...VARIANT_STYLE[variant],
         ...SIZE_STYLE[size],
-        fontFamily: 'var(--font-ui)',
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
-        opacity: props.disabled ? 0.5 : 1,
-        transition: 'all var(--motion-duration) var(--motion-easing)',
         ...style,
       }}
     />

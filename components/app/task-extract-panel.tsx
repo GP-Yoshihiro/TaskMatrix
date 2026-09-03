@@ -111,7 +111,7 @@ export function TaskExtractPanel({
   return (
     <section style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <h2 style={{ fontWeight: 600 }}>AI タスク抽出</h2>
+        <h2 className="tm-h2">AI タスク抽出</h2>
         <Button onClick={handleExtract} disabled={isPending}>
           {extracting ? '解析中…' : 'タスクを抽出'}
         </Button>

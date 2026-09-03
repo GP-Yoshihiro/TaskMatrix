@@ -93,7 +93,7 @@ export function ApiTokenPanel({
 
   return (
     <section style={{ display: 'grid', gap: 12 }}>
-      <h2 style={{ fontWeight: 600 }}>連携トークン（iOS ショートカット）</h2>
+      <h2 className="tm-h2">連携トークン（iOS ショートカット）</h2>
 
       <p style={{ fontSize: '0.8rem', ...muted }}>
         iPhone のショートカットや Siri から、このプロジェクトにタスクを追加したり、

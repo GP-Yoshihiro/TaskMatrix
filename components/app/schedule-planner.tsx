@@ -202,7 +202,7 @@ export function SchedulePlanner({
   return (
     <section style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <h2 style={{ fontWeight: 600 }}>スケジュール算出</h2>
+        <h2 className="tm-h2">スケジュール算出</h2>
         <Button onClick={handlePlan} disabled={isPending || pendingTaskCount === 0}>
           {planning ? '処理中…' : 'スケジュールを算出'}
         </Button>

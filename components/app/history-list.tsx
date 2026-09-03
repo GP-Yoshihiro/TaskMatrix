@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { loadMoreHistoryAction } from '@/lib/actions/history'
 import { callAction } from '@/lib/client/safe-action'
 import { ACTION_LABEL, fileColor, summarizeChanges } from '@/lib/domain/history'
@@ -142,16 +143,25 @@ export function HistoryList({
       </div>
 
       {entries.length === 0 && !loading ? (
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
-          {isEmptyFilter(filter)
-            ? 'まだ変更履歴がありません。'
-            : '条件に合う変更履歴がありません。'}
-        </p>
+        <EmptyState
+          icon={isEmptyFilter(filter) ? '🕘' : '🔍'}
+          title={
+            isEmptyFilter(filter)
+              ? 'まだ変更履歴がありません'
+              : '条件に合う変更履歴がありません'
+          }
+          description={
+            isEmptyFilter(filter)
+              ? 'ファイルを追加・編集・削除すると、ここに記録されます。'
+              : '条件を緩めるか、「条件を消す」で最初から表示できます。'
+          }
+        />
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 2 }}>
           {entries.map((entry) => (
             <li
               key={entry.id}
+              className="tm-row"
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'auto auto minmax(0, 1fr) auto minmax(0, 7rem)',

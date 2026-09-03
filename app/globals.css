@@ -149,3 +149,105 @@ a:hover {
   color: var(--color-fg-muted);
 }
 .markdown-preview hr { border: none; border-top: 1px solid var(--color-border); margin: 1em 0; }
+
+/* ============================================================
+ * 共通の部品
+ *
+ * インラインの style では :hover や :focus-visible を書けない。
+ * 押せるものが押せると見て分かるよう、状態はここで定義する。
+ * あわせて、描画のたびに大きな style オブジェクトを作らずに済む。
+ * ============================================================ */
+
+/* キーボードで辿っている人にだけ枠を出す。マウス操作の邪魔をしない */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- ボタン ---- */
+
+.tm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+
+.tm-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tm-button:not(:disabled):hover {
+  filter: brightness(0.96);
+}
+
+.tm-button:not(:disabled):active {
+  filter: brightness(0.92);
+}
+
+/* ---- 押せる行（一覧の項目など） ---- */
+
+.tm-row {
+  transition: background-color 0.12s ease;
+}
+
+.tm-row:hover {
+  background: color-mix(in srgb, var(--color-fg) 5%, var(--color-surface)) !important;
+}
+
+/* ---- 移動先のリンク ---- */
+
+.tm-nav-link {
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.tm-nav-link:hover {
+  background: color-mix(in srgb, var(--color-fg) 6%, transparent) !important;
+  text-decoration: none;
+}
+
+.tm-nav-link[aria-current='page']:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent) !important;
+}
+
+/* ---- 入力欄 ---- */
+
+.tm-input {
+  transition: border-color 0.12s ease;
+}
+
+.tm-input:hover:not(:disabled) {
+  border-color: var(--color-fg-muted);
+}
+
+.tm-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.tm-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---- 見出しの階層 ---- */
+
+.tm-h2 {
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+.tm-h3 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}

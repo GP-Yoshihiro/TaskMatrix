@@ -41,6 +41,7 @@ function NavLink({
       href={href}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
+      className="tm-nav-link"
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -143,6 +144,7 @@ export function Sidebar({
                       setSwitching(false)
                       onNavigate()
                     }}
+                    className="tm-nav-link"
                     style={{
                       display: 'block',
                       padding: '6px 12px',

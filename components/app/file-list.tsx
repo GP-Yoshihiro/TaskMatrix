@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 import { createDownloadUrlAction, deleteFileAction } from '@/lib/actions/files'
 import { callAction } from '@/lib/client/safe-action'
 import type { ProjectFile } from '@/lib/repositories/files'
@@ -51,7 +52,13 @@ export function FileList({
   }
 
   if (files.length === 0) {
-    return <p style={{ color: 'var(--color-fg-muted)' }}>ファイルがまだありません。</p>
+    return (
+      <EmptyState
+        icon="📄"
+        title="ファイルがまだありません"
+        description="上の「Markdown を新規作成」でメモを作るか、「アップロード」から Excel・Word・PowerPoint・PDF を追加できます。"
+      />
+    )
   }
 
   return (
@@ -72,6 +79,7 @@ export function FileList({
         {files.map((file) => (
           <li
             key={file.id}
+            className="tm-row"
             style={{
               display: 'flex',
               gap: 12,
@@ -81,6 +89,7 @@ export function FileList({
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-md)',
               padding: 12,
+              background: 'var(--color-surface)',
             }}
           >
             <Link href={`/projects/${projectId}/files/${file.id}`} style={{ fontWeight: 500 }}>

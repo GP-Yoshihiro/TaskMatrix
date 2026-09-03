@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Input } from '@/components/ui/input'
 import { createFolderAction, deleteFolderAction } from '@/lib/actions/folders'
 import type { FolderNode } from '@/lib/domain/folders'
@@ -106,7 +107,7 @@ export function FolderTree({
 
   return (
     <section style={{ display: 'grid', gap: 12 }}>
-      <h2 style={{ fontWeight: 600 }}>フォルダ</h2>
+      <h2 className="tm-h2">フォルダ</h2>
       <form action={handleCreate} style={{ display: 'flex', gap: 8 }}>
         <Input name="name" placeholder="フォルダ名" disabled={isPending} />
         <select
@@ -138,7 +139,11 @@ export function FolderTree({
         </p>
       )}
       {tree.length === 0 ? (
-        <p style={{ color: 'var(--color-fg-muted)' }}>フォルダがまだありません。</p>
+        <EmptyState
+          icon="📁"
+          title="フォルダがまだありません"
+          description="上の入力欄から作成できます。フォルダは入れ子にでき、ファイルの整理に使えます。"
+        />
       ) : (
         <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 6 }}>
           {tree.map((node) => (
