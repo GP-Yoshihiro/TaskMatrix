@@ -1,8 +1,10 @@
 'use server'
 
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { describeAuthFailure, validateCredentials } from '@/lib/domain/auth'
 import { normalizeCode } from '@/lib/domain/invitation'
+import { REAUTH_COOKIE } from '@/lib/domain/reauth'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { createSupabaseInvitationRepository } from '@/lib/repositories/invitations'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -97,5 +99,11 @@ export async function signInAction(formData: FormData): Promise<Result<null>> {
 export async function signOutAction(): Promise<void> {
   const supabase = await createServerSupabaseClient()
   await supabase.auth.signOut()
+
+  // パスワード確認の印も破棄する。残すと、時間内に入り直したときに
+  // 確認を求められないまま招待コードを操作できてしまう
+  const cookieStore = await cookies()
+  cookieStore.delete({ name: REAUTH_COOKIE, path: '/settings' })
+
   redirect('/login')
 }

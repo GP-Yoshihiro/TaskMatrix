@@ -9,12 +9,15 @@ import { decryptSecret, encryptSecret } from './crypto'
  *
  * 確認できたことは Cookie に持たせるが、**中身は暗号化して利用者 ID と期限を封じる**。
  * 平文の印を置くと、値を作れば誰でも確認済みを名乗れてしまう。
+ *
+ * 印は**ログアウトで破棄する**（`signOutAction`）。時間が残っていても、
+ * 一度離席の意思を示した以上は確認をやり直す。
  */
 
 export const REAUTH_COOKIE = 'tm_reauth'
 
 /** 確認が有効な時間。席を離れる程度の間で切れる長さにする */
-export const REAUTH_TTL_MS = 15 * 60 * 1000
+export const REAUTH_TTL_MS = 10 * 60 * 1000
 
 const SEPARATOR = ':'
 

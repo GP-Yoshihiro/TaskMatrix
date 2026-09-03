@@ -10,6 +10,13 @@ function later(ms: number): Date {
   return new Date(NOW.getTime() + ms)
 }
 
+describe('REAUTH_TTL_MS', () => {
+  it('有効時間は 10 分', () => {
+    // 短くする合意をした値。うっかり伸ばさないように固定しておく
+    expect(REAUTH_TTL_MS).toBe(10 * 60 * 1000)
+  })
+})
+
 describe('buildReauthToken / verifyReauthToken', () => {
   it('発行直後は通る', () => {
     const token = buildReauthToken(USER, NOW, KEY)
