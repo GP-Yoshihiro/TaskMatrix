@@ -82,6 +82,7 @@ export default async function SchedulePage({
             process.env.GOOGLE_TOKEN_ENCRYPTION_KEY,
         )}
         lastSyncedAt={connection?.lastSyncedAt ?? null}
+        needsReconnect={connection?.needsReconnect ?? false}
         unsyncedCount={unsynced.length}
         result={google ?? null}
       />
