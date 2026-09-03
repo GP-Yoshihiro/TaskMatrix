@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { CopyButton } from '@/components/ui/copy-button'
 import { Input } from '@/components/ui/input'
-import { issueInvitationAction, revokeInvitationAction } from '@/lib/actions/invitations'
+import { PasswordGate } from '@/components/features/settings/password-gate'
+import {
+  issueInvitationAction,
+  revealInvitationCodesAction,
+  revokeInvitationAction,
+} from '@/lib/actions/invitations'
 import { callAction } from '@/lib/client/safe-action'
 import { DEFAULT_EXPIRY_DAYS, invitationStatus } from '@/lib/domain/invitation'
-import type { RevealedInvitation } from '@/lib/usecases/reveal-invitations'
+import type { InvitationSummary } from '@/lib/usecases/reveal-invitations'
 
 const muted = { color: 'var(--color-fg-muted)' }
 
@@ -67,17 +72,64 @@ function CodeRow({ code }: { code: string | null }) {
  * 一覧では既定で伏せ、押した行だけ開く。常に全件を並べると、
  * 画面を開いたままにしているときに背後から読まれる面が広がるため。
  */
-export function InvitationPanel({ invitations }: { invitations: RevealedInvitation[] }) {
+export function InvitationPanel({ invitations }: { invitations: InvitationSummary[] }) {
   const [note, setNote] = useState('')
   const [issued, setIssued] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [message, setMessage] = useState<{ text: string; isError: boolean } | null>(null)
+  /** 復号したコード。null のあいだは施錠中 */
+  const [codes, setCodes] = useState<Record<string, string | null> | null>(null)
+  /** 確認が済んだら行う操作。確認のあとに繋げるために覚えておく */
+  const [pending, setPending] = useState<{ kind: 'issue' } | { kind: 'open'; id: string } | null>(
+    null,
+  )
+  const [asking, setAsking] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
   const now = new Date()
+  const unlocked = codes !== null
+
+  /**
+   * 施錠中なら確認を挟む。
+   *
+   * 画面側で止めるのは操作の入口を揃えるためで、守っているのはサーバー側。
+   * ここを迂回して呼ばれても、行為そのものが拒否される。
+   */
+  function guard(intent: { kind: 'issue' } | { kind: 'open'; id: string }): boolean {
+    if (unlocked) return true
+
+    setMessage(null)
+    setPending(intent)
+    setAsking(true)
+    return false
+  }
+
+  /** 確認が通ったら、コードを読み出してから待たせていた操作を続ける */
+  function handleUnlocked() {
+    setAsking(false)
+
+    startTransition(async () => {
+      const result = await callAction(() => revealInvitationCodesAction())
+      if (!result.ok) {
+        setMessage({ text: result.error.message, isError: true })
+        return
+      }
+
+      setCodes(Object.fromEntries(result.data.map((item) => [item.id, item.code])))
+
+      if (pending?.kind === 'open') setOpenId(pending.id)
+      // 発行はその場では続けない。押した意図の確認から時間が空くため
+      if (pending?.kind === 'issue') {
+        setMessage({ text: '確認できました。発行するボタンを押してください。', isError: false })
+      }
+      setPending(null)
+    })
+  }
 
   function handleIssue() {
+    if (!guard({ kind: 'issue' })) return
+
     setMessage(null)
     setIssued(null)
 
@@ -90,6 +142,13 @@ export function InvitationPanel({ invitations }: { invitations: RevealedInvitati
         setIssued(result.data.code)
         setNote('')
         router.refresh()
+
+        // 手元の一覧にも反映する。取り直さないと、発行したばかりの行だけ
+        // 「読み返せません」と出てしまう
+        const reloaded = await callAction(() => revealInvitationCodesAction())
+        if (reloaded.ok) {
+          setCodes(Object.fromEntries(reloaded.data.map((item) => [item.id, item.code])))
+        }
       } else {
         setMessage({ text: result.error.message, isError: true })
       }
@@ -97,6 +156,8 @@ export function InvitationPanel({ invitations }: { invitations: RevealedInvitati
   }
 
   function handleRevoke(id: string) {
+    if (!guard({ kind: 'open', id })) return
+
     setMessage(null)
 
     const formData = new FormData()
@@ -115,6 +176,22 @@ export function InvitationPanel({ invitations }: { invitations: RevealedInvitati
 
   return (
     <div style={{ display: 'grid', gap: 20 }}>
+      {asking && (
+        <PasswordGate
+          onUnlocked={handleUnlocked}
+          onCancel={() => {
+            setAsking(false)
+            setPending(null)
+          }}
+        />
+      )}
+
+      {!unlocked && !asking && (
+        <p style={{ ...muted, fontSize: '0.82rem' }}>
+          発行・コピー・詳細の表示には、パスワードの確認が必要です。
+        </p>
+      )}
+
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 className="tm-h2">コードを発行する</h2>
         <p style={{ ...muted, fontSize: '0.82rem' }}>
@@ -183,7 +260,14 @@ export function InvitationPanel({ invitations }: { invitations: RevealedInvitati
                   <Card key={invitation.id} style={{ display: 'grid', gap: 10 }}>
                     <button
                       type="button"
-                      onClick={() => setOpenId(isOpen ? null : invitation.id)}
+                      onClick={() => {
+                        if (isOpen) {
+                          setOpenId(null)
+                          return
+                        }
+                        if (!guard({ kind: 'open', id: invitation.id })) return
+                        setOpenId(invitation.id)
+                      }}
                       aria-expanded={isOpen}
                       style={{
                         display: 'flex',
@@ -222,7 +306,7 @@ export function InvitationPanel({ invitations }: { invitations: RevealedInvitati
                           borderTop: '1px solid var(--color-border)',
                         }}
                       >
-                        <CodeRow code={invitation.code} />
+                        <CodeRow code={codes?.[invitation.id] ?? null} />
 
                         <dl
                           style={{
