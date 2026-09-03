@@ -13,10 +13,19 @@ type Props = {
   action: (formData: FormData) => Promise<Result<null>>
   redirectTo: string
   footer: ReactNode
+  /** 画面ごとに増える入力欄。メールアドレスより前に置く */
+  extraFields?: ReactNode
 }
 
 /** ログインとサインアップで共有する認証フォーム */
-export function AuthForm({ title, submitLabel, action, redirectTo, footer }: Props) {
+export function AuthForm({
+  title,
+  submitLabel,
+  action,
+  redirectTo,
+  footer,
+  extraFields,
+}: Props) {
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -38,6 +47,7 @@ export function AuthForm({ title, submitLabel, action, redirectTo, footer }: Pro
     <Card style={{ maxWidth: 400, margin: '10vh auto', display: 'grid', gap: 16 }}>
       <h1 style={{ fontSize: '1.4rem', fontWeight: 600 }}>{title}</h1>
       <form action={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+        {extraFields}
         <label style={{ display: 'grid', gap: 4 }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--color-fg-muted)' }}>
             メールアドレス
