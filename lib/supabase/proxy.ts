@@ -9,9 +9,21 @@ const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/settings']
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
 
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  /*
+   * 設定が欠けているときは、ここで例外を投げない。
+   *
+   * 投げると proxy を通る全経路（静的ファイルも含む）が 500 になり、
+   * 「何が起きているのか」を確かめる手段まで失われる。
+   * セッションの更新だけを諦めて通し、原因は /api/health で確かめられるようにする。
+   */
+  if (!url || !anonKey) return response
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll() {
