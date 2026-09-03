@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { DisplayNameForm } from '@/components/app/display-name-form'
 import { ThemeSwitcher } from '@/components/app/theme-switcher'
 import { WorkSettingsForm } from '@/components/app/work-settings-form'
@@ -40,8 +41,8 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 24, maxWidth: 640 }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>設定</h1>
+    <div style={{ display: 'grid', gap: 24, maxWidth: 680 }}>
+      <PageHeader title="設定" description="表示名・テーマ・稼働条件と、使用量の確認です。" />
       <section style={{ display: 'grid', gap: 8 }}>
         <h2 style={{ fontWeight: 600 }}>アカウント</h2>
         <p style={{ color: 'var(--color-fg-muted)' }}>{profile?.email}</p>

@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { LogoutButton } from '@/components/app/logout-button'
+import { AppShell } from '@/components/layout/app-shell'
+import { createSupabaseProjectRepository } from '@/lib/repositories/projects'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -12,29 +12,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   if (!user) redirect('/login')
 
-  return (
-    <div style={{ minHeight: '100dvh', display: 'grid', gridTemplateRows: 'auto 1fr' }}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          padding: 'calc(var(--space-unit) * 3) calc(var(--space-unit) * 5)',
-          borderBottom: '1px solid var(--color-border)',
-          background: 'var(--color-surface)',
-        }}
-      >
-        <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <Link href="/dashboard" style={{ fontWeight: 600 }}>
-            TaskMatrix
-          </Link>
-          <Link href="/projects">プロジェクト</Link>
-          <Link href="/settings">設定</Link>
-        </nav>
-        <LogoutButton />
-      </header>
-      <main style={{ padding: 'calc(var(--space-unit) * 6)' }}>{children}</main>
-    </div>
-  )
+  // サイドバーからプロジェクトを切り替えられるよう、一覧をここで読む。
+  // 読めなくても画面は出す（移動先が減るだけで、操作は続けられる）
+  let projects: { id: string; name: string }[] = []
+  try {
+    projects = (await createSupabaseProjectRepository(supabase).listByOwner(user.id)).map(
+      (project) => ({ id: project.id, name: project.name }),
+    )
+  } catch {
+    projects = []
+  }
+
+  return <AppShell projects={projects}>{children}</AppShell>
 }

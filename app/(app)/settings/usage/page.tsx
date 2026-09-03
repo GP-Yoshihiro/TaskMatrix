@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
 import {
   OPERATION_LABEL,
@@ -52,11 +53,17 @@ export default async function UsagePage() {
   const breakdown = aggregateByOperation(monthly.logs)
 
   return (
-    <div style={{ display: 'grid', gap: 24, maxWidth: 860 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>AI の使用量</h1>
-        <Link href="/settings">設定へ戻る</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        pageLabel="AI の使用量"
+        title="AI の使用量"
+        description="これまでに使ったトークン量と、処理にかかった時間です。"
+        actions={
+          <Link href="/settings" style={{ fontSize: '0.85rem' }}>
+            設定へ戻る
+          </Link>
+        }
+      />
 
       {/* 取得できない値を出さない理由を明示する */}
       <Card style={{ display: 'grid', gap: 6 }}>

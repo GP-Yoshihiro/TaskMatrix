@@ -1,5 +1,5 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/layout/page-header'
 import { RagChat } from '@/components/app/rag-chat'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseChatRepository } from '@/lib/repositories/chat'
@@ -48,11 +48,14 @@ export default async function ChatPage({
   }
 
   return (
-    <div style={{ display: 'grid', gap: 20, maxWidth: 900 }}>
-      <header style={{ display: 'flex', gap: 16, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 600 }}>{project.name} の AI チャット</h1>
-        <Link href={`/projects/${projectId}`}>プロジェクトへ戻る</Link>
-      </header>
+    <div style={{ display: 'grid', gap: 24 }}>
+      <PageHeader
+        projectId={projectId}
+        projectName={project.name}
+        pageLabel="AI チャット"
+        title="AI チャット"
+        description="プロジェクト内の資料を根拠に、質問へ答えます。"
+      />
       <RagChat
         projectId={projectId}
         messages={messages}
