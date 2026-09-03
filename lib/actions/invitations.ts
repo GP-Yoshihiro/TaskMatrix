@@ -2,6 +2,8 @@
 
 import { randomBytes } from 'node:crypto'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
+import { encryptSecret } from '@/lib/domain/crypto'
 import {
   DEFAULT_EXPIRY_DAYS,
   buildCode,
@@ -10,15 +12,22 @@ import {
   hashCode,
 } from '@/lib/domain/invitation'
 import { type Result, err, ok } from '@/lib/domain/result'
+import { REAUTH_COOKIE, verifyReauthToken } from '@/lib/domain/reauth'
 import { createSupabaseInvitationRepository } from '@/lib/repositories/invitations'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { type RevealedInvitation, revealInvitations } from '@/lib/usecases/reveal-invitations'
 
 /** コードの元になる乱数の長さ */
 const CODE_BYTES = 16
 
 const MAX_NOTE_LENGTH = 60
 
-/** 管理者かどうか。発行できるのは管理者のみ */
+/**
+ * 管理者であり、かつ直前にパスワードを確認済みであること。
+ *
+ * 画面側だけで止めても意味がない。この関数を通らない経路から
+ * 直接呼ばれれば素通りするため、サーバー側で必ず確かめる。
+ */
 async function requireAdmin(): Promise<Result<{ userId: string }>> {
   const supabase = await createServerSupabaseClient()
   const {
@@ -36,7 +45,38 @@ async function requireAdmin(): Promise<Result<{ userId: string }>> {
     return err('FORBIDDEN', '招待コードを発行できるのは管理者のみです。')
   }
 
+  const cookieStore = await cookies()
+  const token = cookieStore.get(REAUTH_COOKIE)?.value ?? ''
+
+  if (
+    !verifyReauthToken(token, user.id, new Date(), process.env.GOOGLE_TOKEN_ENCRYPTION_KEY)
+  ) {
+    return err('UNAUTHENTICATED', 'パスワードの確認が必要です。')
+  }
+
   return ok({ userId: user.id })
+}
+
+/**
+ * 発行済みコードの全文を返す。
+ *
+ * 画面の初期表示には含めない。含めると、パスワードを確認する前に
+ * すでに手元へ届いてしまい、伏せているだけの見せかけになる。
+ */
+export async function revealInvitationCodesAction(): Promise<Result<RevealedInvitation[]>> {
+  const admin = await requireAdmin()
+  if (!admin.ok) return admin
+
+  try {
+    const supabase = await createServerSupabaseClient()
+    const stored = await createSupabaseInvitationRepository(supabase).listByCreator(
+      admin.data.userId,
+    )
+
+    return ok(revealInvitations(stored, process.env.GOOGLE_TOKEN_ENCRYPTION_KEY))
+  } catch {
+    return err('UNKNOWN', '招待コードを読み出せませんでした。')
+  }
 }
 
 /**
@@ -57,10 +97,17 @@ export async function issueInvitationAction(
 
   const code = buildCode(randomBytes(CODE_BYTES))
 
+  // 読み返せるように暗号化して持つ。鍵はデータベースの外に置く
+  const key = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY
+  if (!key) {
+    return err('SERVICE_NOT_CONFIGURED', 'サーバーの設定が不足しているため発行できません。')
+  }
+
   try {
     const supabase = await createServerSupabaseClient()
     await createSupabaseInvitationRepository(supabase).create({
       codeHash: hashCode(code),
+      codeEncrypted: encryptSecret(code, key),
       displayPrefix: displayPrefix(code),
       note,
       createdBy: admin.data.userId,

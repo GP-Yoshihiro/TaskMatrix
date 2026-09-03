@@ -4,6 +4,8 @@ import type { InvitationClaimRepository } from '@/lib/usecases/redeem-invitation
 export type Invitation = {
   id: string
   displayPrefix: string
+  /** 暗号化した本体。管理者が読み返すためだけに持つ */
+  codeEncrypted: string
   note: string
   createdAt: string
   expiresAt: string
@@ -14,6 +16,7 @@ export type Invitation = {
 export interface InvitationRepository extends InvitationClaimRepository {
   create(input: {
     codeHash: string
+    codeEncrypted: string
     displayPrefix: string
     note: string
     createdBy: string
@@ -26,6 +29,7 @@ export interface InvitationRepository extends InvitationClaimRepository {
 type Row = {
   id: string
   display_prefix: string
+  code_encrypted: string
   note: string
   created_at: string
   expires_at: string
@@ -33,12 +37,14 @@ type Row = {
   revoked_at: string | null
 }
 
-const COLUMNS = 'id, display_prefix, note, created_at, expires_at, used_at, revoked_at'
+const COLUMNS =
+  'id, display_prefix, code_encrypted, note, created_at, expires_at, used_at, revoked_at'
 
 function toInvitation(row: Row): Invitation {
   return {
     id: row.id,
     displayPrefix: row.display_prefix,
+    codeEncrypted: row.code_encrypted,
     note: row.note,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
@@ -63,6 +69,7 @@ export function createSupabaseInvitationRepository(
         .from('invitations')
         .insert({
           code_hash: input.codeHash,
+          code_encrypted: input.codeEncrypted,
           display_prefix: input.displayPrefix,
           note: input.note,
           created_by: input.createdBy,
