@@ -12,6 +12,8 @@ export default function SignupPage() {
       footer={
         <>
           すでにアカウントをお持ちの場合は <Link href="/login">ログイン</Link> へ。
+          <br />
+          登録により <Link href="/privacy">プライバシーポリシー</Link> に同意したものとみなします。
         </>
       }
     />

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
+import { DeleteAccount } from '@/components/features/settings/delete-account'
 import { DisplayNameForm } from '@/components/features/settings/display-name-form'
 import { ThemeSwitcher } from '@/components/features/settings/theme-switcher'
 import { WorkSettingsForm } from '@/components/features/settings/work-settings-form'
@@ -82,6 +83,7 @@ export default async function SettingsPage() {
         </p>
         <WorkSettingsForm settings={workSettings} />
       </section>
+      {profile?.email && <DeleteAccount email={profile.email} />}
     </div>
   )
 }
