@@ -24,6 +24,8 @@ export default function SignupPage() {
           すでにアカウントをお持ちの場合は <Link href="/login">ログイン</Link> へ。
           <br />
           登録により <Link href="/privacy">プライバシーポリシー</Link> に同意したものとみなします。
+          <br />
+          はじめての方は <Link href="/guide">使い方</Link> をご覧ください。
         </>
       }
     />
