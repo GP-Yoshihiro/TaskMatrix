@@ -13,6 +13,8 @@ export default function LoginPage() {
         <>
           アカウントをお持ちでない場合は <Link href="/signup">新規登録</Link> へ。
           <br />
+          <Link href="/guide">使い方</Link>
+          {' ・ '}
           <Link href="/privacy">プライバシーポリシー</Link>
         </>
       }
