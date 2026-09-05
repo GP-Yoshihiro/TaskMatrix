@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
+import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { WithUsage } from '@/lib/domain/usage'
 import { isTaskPriority } from '@/lib/domain/tasks'
@@ -16,6 +19,22 @@ import { type TaskSuggestion, extractTasksFromFile } from '@/lib/usecases/extrac
 import { trackUsage } from '@/lib/usecases/track-usage'
 
 const BUCKET = 'project-files'
+
+/**
+ * 上限に達したことを運用者へ知らせる役。
+ *
+ * 記録は本人の権限で行う。RLS により自分の分しか書けず、
+ * 読めるのは本人と管理者だけになる。
+ */
+function createLimitNotifier(supabase: SupabaseClient, userId: string) {
+  return async (reason: LimitReason) => {
+    await createSupabaseLimitNotificationRepository(supabase).record({
+      userId,
+      reachedOn: jstDateKey(new Date()),
+      reason,
+    })
+  }
+}
 
 export async function extractTasksAction(
   formData: FormData,
@@ -35,7 +54,7 @@ export async function extractTasksAction(
   try {
     return await trackUsage(
       createSupabaseAiUsageRepository(supabase),
-      { userId: user.id, projectId, operation: 'extract_tasks' },
+      { userId: user.id, projectId, operation: 'extract_tasks', onLimitReached: createLimitNotifier(supabase, user.id) },
       () =>
         extractTasksFromFile(
           {

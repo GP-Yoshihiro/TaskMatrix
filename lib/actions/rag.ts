@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
+import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { WithUsage } from '@/lib/domain/usage'
 import { createOfficeParserExtractor } from '@/lib/extraction/text'
@@ -18,6 +21,22 @@ import { trackUsage } from '@/lib/usecases/track-usage'
 
 const BUCKET = 'project-files'
 
+/**
+ * 上限に達したことを運用者へ知らせる役。
+ *
+ * 記録は本人の権限で行う。RLS により自分の分しか書けず、
+ * 読めるのは本人と管理者だけになる。
+ */
+function createLimitNotifier(supabase: SupabaseClient, userId: string) {
+  return async (reason: LimitReason) => {
+    await createSupabaseLimitNotificationRepository(supabase).record({
+      userId,
+      reachedOn: jstDateKey(new Date()),
+      reason,
+    })
+  }
+}
+
 export async function buildIndexAction(
   formData: FormData,
 ): Promise<Result<WithUsage<{ files: number; chunks: number }>>> {
@@ -33,7 +52,7 @@ export async function buildIndexAction(
   try {
     const result = await trackUsage(
       createSupabaseAiUsageRepository(supabase),
-      { userId: user.id, projectId, operation: 'build_index' },
+      { userId: user.id, projectId, operation: 'build_index', onLimitReached: createLimitNotifier(supabase, user.id) },
       () =>
         buildIndexForProject(
           {
@@ -78,7 +97,7 @@ export async function askAction(
   try {
     const result = await trackUsage(
       createSupabaseAiUsageRepository(supabase),
-      { userId: user.id, projectId, operation: 'answer_question' },
+      { userId: user.id, projectId, operation: 'answer_question', onLimitReached: createLimitNotifier(supabase, user.id) },
       () =>
         answerQuestion(
           {

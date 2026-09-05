@@ -246,3 +246,60 @@ describe('trackUsage の 1 日の上限', () => {
     expect(recorded).toHaveLength(0)
   })
 })
+
+describe('上限に達したときの知らせ', () => {
+  const BASE = {
+    userId: 'u1',
+    projectId: 'p1',
+    operation: 'extract_tasks' as const,
+    now: () => new Date('2026-09-05T03:00:00.000Z').getTime(),
+  }
+
+  it('止めたときに、理由を添えて知らせる', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: DAILY_CALL_LIMIT, tokens: 0 }),
+    })
+    const onLimitReached = vi.fn(async () => {})
+
+    await trackUsage(repository, { ...BASE, onLimitReached }, vi.fn())
+
+    expect(onLimitReached).toHaveBeenCalledWith('calls')
+  })
+
+  it('トークン量で止めたときは、その理由を渡す', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: 0, tokens: DAILY_TOKEN_LIMIT }),
+    })
+    const onLimitReached = vi.fn(async () => {})
+
+    await trackUsage(repository, { ...BASE, onLimitReached }, vi.fn())
+
+    expect(onLimitReached).toHaveBeenCalledWith('tokens')
+  })
+
+  it('上限内なら知らせない', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: 1, tokens: 100 }),
+    })
+    const onLimitReached = vi.fn(async () => {})
+
+    await trackUsage(repository, { ...BASE, onLimitReached }, async () => ok({ usage: USAGE }))
+
+    expect(onLimitReached).not.toHaveBeenCalled()
+  })
+
+  it('知らせに失敗しても、止めた結果は変わらない', async () => {
+    // 通知は付随的な機能であり、これが原因で挙動が変わってはいけない
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: DAILY_CALL_LIMIT, tokens: 0 }),
+    })
+    const onLimitReached = vi.fn(async () => {
+      throw new Error('知らせられません')
+    })
+
+    const result = await trackUsage(repository, { ...BASE, onLimitReached }, vi.fn())
+
+    if (result.ok) throw new Error('止まっていない')
+    expect(result.error.code).toBe('RATE_LIMITED')
+  })
+})
