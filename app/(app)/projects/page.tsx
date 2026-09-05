@@ -3,13 +3,12 @@ import { ProjectCreateForm } from '@/components/features/projects/project-create
 import { ProjectList } from '@/components/features/projects/project-list'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
 import { createSupabaseProjectRepository } from '@/lib/repositories/projects'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export default async function ProjectsPage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   const projects = user
     ? await createSupabaseProjectRepository(supabase).listByOwner(user.id)

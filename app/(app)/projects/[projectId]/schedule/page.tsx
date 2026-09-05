@@ -8,6 +8,7 @@ import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/goo
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { loadEstimate } from '@/lib/usecases/load-estimate'
 
@@ -33,9 +34,7 @@ export default async function SchedulePage({
 
   if (!project) notFound()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   const [tasks, confirmed, savedSettings] = await Promise.all([
     createSupabaseTaskRepository(supabase).listByProject(projectId),

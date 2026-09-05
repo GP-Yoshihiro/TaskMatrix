@@ -4,6 +4,7 @@ import { RagChat } from '@/components/features/chat/rag-chat'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseChatRepository } from '@/lib/repositories/chat'
 import { createSupabaseFileChunkRepository } from '@/lib/repositories/file-chunks'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { loadEstimate } from '@/lib/usecases/load-estimate'
 
@@ -26,9 +27,7 @@ export default async function ChatPage({
 
   if (!project) notFound()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   const chunks = createSupabaseFileChunkRepository(supabase)
   const chat = createSupabaseChatRepository(supabase)

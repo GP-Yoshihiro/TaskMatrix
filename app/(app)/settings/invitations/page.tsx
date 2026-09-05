@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { InvitationPanel } from '@/components/features/settings/invitation-panel'
 import { PageHeader } from '@/components/layout/page-header'
 import { createSupabaseInvitationRepository } from '@/lib/repositories/invitations'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { toSummaries } from '@/lib/usecases/reveal-invitations'
 
@@ -13,9 +14,7 @@ import { toSummaries } from '@/lib/usecases/reveal-invitations'
  */
 export default async function InvitationsPage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 

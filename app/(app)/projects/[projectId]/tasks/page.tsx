@@ -12,15 +12,15 @@ export default async function TasksPage({
   const { projectId } = await params
   const supabase = await createServerSupabaseClient()
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id, name')
-    .eq('id', projectId)
-    .maybeSingle()
+  // 両者は互いに依存しない。順に待つと待ち時間が足し算になる。
+  // 行レベルセキュリティにより、他人のプロジェクトなら
+  // どちらも空で返るため、先に取得しても情報は漏れない
+  const [{ data: project }, tasks] = await Promise.all([
+    supabase.from('projects').select('id, name').eq('id', projectId).maybeSingle(),
+    createSupabaseTaskRepository(supabase).listByProject(projectId),
+  ])
 
   if (!project) notFound()
-
-  const tasks = await createSupabaseTaskRepository(supabase).listByProject(projectId)
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
