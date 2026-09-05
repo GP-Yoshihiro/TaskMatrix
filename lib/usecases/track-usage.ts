@@ -1,4 +1,5 @@
 import { checkDailyLimit, startOfJstDay } from '@/lib/domain/ai-limit'
+import type { LimitReason } from '@/lib/domain/limit-notification'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { EMPTY_USAGE, type AiOperation, type AiUsage } from '@/lib/domain/usage'
 import type { AiUsageRepository, RecordUsageInput } from '@/lib/repositories/ai-usage'
@@ -25,6 +26,12 @@ type Context = {
   userId: string
   projectId: string | null
   operation: AiOperation
+  /**
+   * 上限で止めたときに呼ぶ。費用を負担している運用者へ知らせるため。
+   *
+   * 失敗しても止めた事実は変わらないので、呼び出し元へは伝えない。
+   */
+  onLimitReached?: (reason: LimitReason) => Promise<void>
   /** テストから時計を差し替えるための口 */
   now?: () => number
 }
@@ -56,6 +63,14 @@ export async function trackUsage<T extends { usage: AiUsage }>(
     const decision = checkDailyLimit(used, now)
 
     if (!decision.allowed) {
+      if (decision.reason && context.onLimitReached) {
+        try {
+          await context.onLimitReached(decision.reason)
+        } catch {
+          // 知らせられなくても、止めた事実は変わらない
+        }
+      }
+
       return err('RATE_LIMITED', buildLimitMessage(decision))
     }
   } catch {

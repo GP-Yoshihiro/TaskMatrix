@@ -1,6 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
+import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { type Result, err, ok } from '@/lib/domain/result'
 import { isTaskWeight } from '@/lib/domain/schedule'
 import type { WithUsage } from '@/lib/domain/usage'
@@ -31,6 +34,22 @@ function todayIn(timezone: string): string {
   return formatter.format(new Date())
 }
 
+/**
+ * 上限に達したことを運用者へ知らせる役。
+ *
+ * 記録は本人の権限で行う。RLS により自分の分しか書けず、
+ * 読めるのは本人と管理者だけになる。
+ */
+function createLimitNotifier(supabase: SupabaseClient, userId: string) {
+  return async (reason: LimitReason) => {
+    await createSupabaseLimitNotificationRepository(supabase).record({
+      userId,
+      reachedOn: jstDateKey(new Date()),
+      reason,
+    })
+  }
+}
+
 export async function planScheduleAction(
   formData: FormData,
 ): Promise<Result<WithUsage<PlanScheduleOutput>>> {
@@ -49,7 +68,7 @@ export async function planScheduleAction(
     const settings = await workSettings.find(user.id)
     return await trackUsage(
       createSupabaseAiUsageRepository(supabase),
-      { userId: user.id, projectId, operation: 'plan_schedule' },
+      { userId: user.id, projectId, operation: 'plan_schedule', onLimitReached: createLimitNotifier(supabase, user.id) },
       () =>
         planScheduleForProject(
           {

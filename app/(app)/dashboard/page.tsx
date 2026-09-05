@@ -1,8 +1,11 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { LimitAlert } from '@/components/features/dashboard/limit-alert'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
+import { AI_STUDIO_PLAN_URL } from '@/lib/domain/ai-plan'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
+import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 type RecentFile = {
@@ -32,9 +35,25 @@ export default async function DashboardPage() {
 
   const files = (recentFiles ?? []) as unknown as RecentFile[]
 
+  // 上限に達した利用者の知らせ。管理者だけが読める（RLS で保証）。
+  // 自分の分は除く。自分が止まったことは、その場の画面で分かっている
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const notices = profile?.is_admin
+    ? await createSupabaseLimitNotificationRepository(supabase)
+        .listUnread(user.id)
+        .catch(() => [])
+    : []
+
   return (
     <div style={{ display: 'grid', gap: 24 }}>
       <PageHeader title="ホーム" description="最近の動きと、プロジェクトの数です。" />
+
+      <LimitAlert notices={notices} planUrl={AI_STUDIO_PLAN_URL} />
 
       <Card style={{ display: 'grid', gap: 4 }}>
         <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.85rem' }}>プロジェクト</span>
