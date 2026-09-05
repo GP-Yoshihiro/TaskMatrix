@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { DAILY_CALL_LIMIT, DAILY_TOKEN_LIMIT } from '@/lib/domain/ai-limit'
 
 /**
  * 使い方の案内。
@@ -209,7 +210,34 @@ export default function GuidePage() {
       </section>
 
       <section style={section}>
-        <h2 style={heading}>7. 困ったとき</h2>
+        <h2 style={heading}>7. AI の利用には 1 日の上限があります</h2>
+        <p style={body}>
+          AI の機能は有料のサービスを使っており、
+          <strong>費用はこのアプリを用意した人がまとめて負担しています。</strong>
+          そのため、お一人あたり次の上限を設けています。
+        </p>
+        <ul style={list}>
+          <li>
+            1 日 <strong>{DAILY_CALL_LIMIT} 回</strong>まで
+          </li>
+          <li>
+            1 日 <strong>{DAILY_TOKEN_LIMIT.toLocaleString('ja-JP')} トークン</strong>まで
+            （トークンは、扱った文章の量だとお考えください）
+          </li>
+        </ul>
+        <p style={body}>
+          ふだんの使い方で届く量ではありません。
+          上限に達した場合は<strong>日本時間の 0 時を過ぎると元に戻ります。</strong>
+        </p>
+        <p style={note}>
+          いまどれだけ使ったかは、<strong>「設定」→「AI の使用量」</strong>で確認できます。
+          同じ資料に対して何度も実行すると早く減るので、
+          必要なときにお使いください。
+        </p>
+      </section>
+
+      <section style={section}>
+        <h2 style={heading}>8. 困ったとき</h2>
         <ul style={list}>
           <li>
             <strong>登録できない</strong> — 招待コードは 1 人 1 回きりで、
@@ -224,6 +252,10 @@ export default function GuidePage() {
             画面に進み具合と目安の時間が出るので、そのままお待ちください。
           </li>
           <li>
+            <strong>AI が「上限に達しました」と出る</strong> — その日の分を使い切っています。
+            日本時間の 0 時を過ぎると、また使えるようになります。
+          </li>
+          <li>
             <strong>画面が古いまま</strong> — アイコンから開いている場合、
             いったん閉じて開き直すと新しくなります。
           </li>
@@ -231,7 +263,7 @@ export default function GuidePage() {
       </section>
 
       <section style={section}>
-        <h2 style={heading}>8. 知っておいていただきたいこと</h2>
+        <h2 style={heading}>9. 知っておいていただきたいこと</h2>
         <ul style={list}>
           <li>
             AI の機能を使うと、<strong>資料の内容が Google の AI サービスへ送られます。</strong>

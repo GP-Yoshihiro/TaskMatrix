@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
+import { checkDailyLimit, startOfJstDay } from '@/lib/domain/ai-limit'
 import {
   OPERATION_LABEL,
   aggregateByOperation,
@@ -43,11 +44,15 @@ export default async function UsagePage() {
 
   if (!user) redirect('/login')
 
+  const now = new Date()
   const repository = createSupabaseAiUsageRepository(supabase)
-  const [monthly, recent] = await Promise.all([
-    repository.listSince(monthStartIso(new Date())),
+  const [monthly, recent, today] = await Promise.all([
+    repository.listSince(monthStartIso(now)),
     repository.listRecent(RECENT_LIMIT),
+    repository.usageSince(startOfJstDay(now).toISOString()),
   ])
+
+  const limit = checkDailyLimit(today, now)
 
   const total = sumUsage(monthly.logs)
   const breakdown = aggregateByOperation(monthly.logs)
@@ -64,6 +69,32 @@ export default async function UsagePage() {
           </Link>
         }
       />
+
+      {/* 今日あとどれだけ使えるかを、真っ先に見せる */}
+      <Card style={{ display: 'grid', gap: 10 }}>
+        <strong style={{ fontSize: '0.9rem' }}>本日の残り</strong>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <UsageBar
+            label="実行回数"
+            used={today.calls}
+            limit={limit.callLimit}
+            format={(value) => `${value} 回`}
+          />
+          <UsageBar
+            label="使用量"
+            used={today.tokens}
+            limit={limit.tokenLimit}
+            format={(value) => `${value.toLocaleString('ja-JP')} トークン`}
+          />
+        </div>
+        <p style={{ fontSize: '0.78rem', ...muted, lineHeight: 1.7 }}>
+          AI の費用は、利用するみなさんで共通のものを使っています。
+          そのため 1 人あたり <strong>1 日 {limit.callLimit} 回・
+          {limit.tokenLimit.toLocaleString('ja-JP')} トークン</strong>までとしています。
+          上限に達すると、日本時間の 0 時を過ぎるまで AI の機能は使えません。
+          {limit.allowed ? '' : ' 現在は上限に達しています。'}
+        </p>
+      </Card>
 
       {/* 取得できない値を出さない理由を明示する */}
       <Card style={{ display: 'grid', gap: 6 }}>
@@ -191,6 +222,52 @@ export default async function UsagePage() {
           </div>
         )}
       </section>
+    </div>
+  )
+}
+
+/** 使った割合を棒で示す。数字だけだと、余裕があるのかが読み取りにくい */
+function UsageBar({
+  label,
+  used,
+  limit,
+  format,
+}: {
+  label: string
+  used: number
+  limit: number
+  format: (value: number) => string
+}) {
+  const ratio = limit === 0 ? 0 : Math.min(1, used / limit)
+  const remaining = Math.max(0, limit - used)
+
+  // 残りが少ないほど強い色にする。数字を読まなくても気付けるように
+  const color =
+    ratio >= 1 ? 'var(--color-danger)' : ratio >= 0.8 ? '#d97706' : 'var(--color-accent)'
+
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+        <span>{label}</span>
+        <span style={muted}>
+          残り {format(remaining)} / {format(limit)}
+        </span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label={`${label}の使用状況`}
+        aria-valuenow={Math.round(ratio * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        style={{
+          height: 6,
+          borderRadius: 999,
+          background: 'var(--color-border)',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ width: `${ratio * 100}%`, height: '100%', background: color }} />
+      </div>
     </div>
   )
 }
