@@ -1,6 +1,25 @@
-import { type Result, ok } from '@/lib/domain/result'
+import { checkDailyLimit, startOfJstDay } from '@/lib/domain/ai-limit'
+import { type Result, err, ok } from '@/lib/domain/result'
 import { EMPTY_USAGE, type AiOperation, type AiUsage } from '@/lib/domain/usage'
 import type { AiUsageRepository, RecordUsageInput } from '@/lib/repositories/ai-usage'
+
+/** 止めたときに利用者へ返す文言。何が上限で、いつ戻るのかを必ず伝える */
+function buildLimitMessage(decision: ReturnType<typeof checkDailyLimit>): string {
+  const at = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(decision.resetsAt)
+
+  const what =
+    decision.reason === 'calls'
+      ? `本日の実行回数の上限（${decision.callLimit} 回）`
+      : `本日の使用量の上限（${decision.tokenLimit.toLocaleString('ja-JP')} トークン）`
+
+  return `${what}に達しました。${at} を過ぎると、また使えるようになります。`
+}
 
 type Context = {
   userId: string
@@ -16,6 +35,12 @@ type Context = {
  * 測るのは利用者が待つ時間そのもの（前処理・埋め込み・AI 呼び出しを含む全体）。
  * 記録に失敗しても AI の結果はそのまま返す。記録は付随的な機能であり、
  * これが原因で本来の処理が失敗するのは本末転倒であるため。
+ *
+ * **実行前に 1 日の上限を確かめる。** ここは AI 呼び出しがすべて通る一点であり、
+ * 個々の機能に判定を散らすと、追加した機能で入れ忘れが起きる。
+ *
+ * 集計に失敗したときは通す。上限は費用の歯止めであって、
+ * 数えられないことを理由に機能そのものを止めるのは行き過ぎであるため。
  */
 export async function trackUsage<T extends { usage: AiUsage }>(
   repository: AiUsageRepository,
@@ -24,6 +49,18 @@ export async function trackUsage<T extends { usage: AiUsage }>(
 ): Promise<Result<T & { durationMs: number }>> {
   const clock = context.now ?? Date.now
   const startedAt = clock()
+  const now = new Date(startedAt)
+
+  try {
+    const used = await repository.usageSince(startOfJstDay(now).toISOString())
+    const decision = checkDailyLimit(used, now)
+
+    if (!decision.allowed) {
+      return err('RATE_LIMITED', buildLimitMessage(decision))
+    }
+  } catch {
+    // 数えられなかった場合は通す
+  }
 
   const save = async (
     input: Omit<RecordUsageInput, 'userId' | 'projectId' | 'operation'>,

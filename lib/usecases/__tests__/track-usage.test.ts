@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { DAILY_CALL_LIMIT, DAILY_TOKEN_LIMIT } from '@/lib/domain/ai-limit'
 import { err, ok } from '@/lib/domain/result'
 import type { AiUsage } from '@/lib/domain/usage'
 import type { AiUsageRepository, RecordUsageInput } from '@/lib/repositories/ai-usage'
@@ -20,6 +21,7 @@ function createRepository(overrides: Partial<AiUsageRepository> = {}) {
     },
     recentDurations: async () => [],
     listSince: async () => ({ logs: [], truncated: false }),
+    usageSince: async () => ({ calls: 0, tokens: 0 }),
     listRecent: async () => [],
     ...overrides,
   }
@@ -157,5 +159,90 @@ describe('trackUsage', () => {
     await trackUsage(repository, context, run)
 
     expect(run).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('trackUsage の 1 日の上限', () => {
+  const CONTEXT = {
+    userId: 'u1',
+    projectId: 'p1',
+    operation: 'extract_tasks' as const,
+    now: () => new Date('2026-09-05T03:00:00.000Z').getTime(),
+  }
+
+  it('上限に達していれば、AI を呼ばずに止める', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: DAILY_CALL_LIMIT, tokens: 0 }),
+    })
+    const run = vi.fn()
+
+    const result = await trackUsage(repository, CONTEXT, run)
+
+    expect(result.ok).toBe(false)
+    // 呼んでしまえばトークンは消費される。手前で止まらなければ意味がない
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('止めたときは、上限といつ戻るかを伝える', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: DAILY_CALL_LIMIT, tokens: 0 }),
+    })
+
+    const result = await trackUsage(repository, CONTEXT, vi.fn())
+
+    if (result.ok) throw new Error('止まっていない')
+    expect(result.error.code).toBe('RATE_LIMITED')
+    expect(result.error.message).toContain('50 回')
+    expect(result.error.message).toContain('9/6')
+  })
+
+  it('トークン量の超過でも止める', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: 1, tokens: DAILY_TOKEN_LIMIT }),
+    })
+
+    const result = await trackUsage(repository, CONTEXT, vi.fn())
+
+    if (result.ok) throw new Error('止まっていない')
+    expect(result.error.message).toContain('300,000')
+  })
+
+  it('上限内なら、これまでどおり実行する', async () => {
+    const { repository } = createRepository({
+      usageSince: async () => ({ calls: 1, tokens: 100 }),
+    })
+    const run = vi.fn(async () => ok({ usage: USAGE }))
+
+    const result = await trackUsage(repository, CONTEXT, run)
+
+    expect(result.ok).toBe(true)
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('集計に失敗しても実行を止めない', async () => {
+    // 上限は費用の歯止めであって、数えられないことを理由に
+    // 機能そのものを止めるのは行き過ぎ
+    const { repository } = createRepository({
+      usageSince: async () => {
+        throw new Error('集計できません')
+      },
+    })
+    const run = vi.fn(async () => ok({ usage: USAGE }))
+
+    const result = await trackUsage(repository, CONTEXT, run)
+
+    expect(result.ok).toBe(true)
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('止めたときは使用量を記録しない', async () => {
+    // 実際には何も使っていない。記録すると回数がさらに増えてしまう
+    const { repository, recorded } = createRepository({
+      usageSince: async () => ({ calls: DAILY_CALL_LIMIT, tokens: 0 }),
+    })
+
+    await trackUsage(repository, CONTEXT, vi.fn())
+
+    expect(recorded).toHaveLength(0)
   })
 })

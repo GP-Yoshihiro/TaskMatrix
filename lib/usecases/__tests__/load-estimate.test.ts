@@ -8,6 +8,7 @@ function createRepository(overrides: Partial<AiUsageRepository> = {}): AiUsageRe
     record: async () => {},
     recentDurations: async () => [],
     listSince: async () => ({ logs: [], truncated: false }),
+    usageSince: async () => ({ calls: 0, tokens: 0 }),
     listRecent: async () => [],
     ...overrides,
   }

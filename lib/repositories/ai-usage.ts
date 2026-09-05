@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { DailyUsage } from '@/lib/domain/ai-limit'
 import type { AiOperation, AiUsage } from '@/lib/domain/usage'
 
 export type AiUsageStatus = 'succeeded' | 'failed'
@@ -37,6 +38,8 @@ export interface AiUsageRepository {
   /** 予測時間の材料。成功した実績のみを新しい順で返す */
   recentDurations(operation: AiOperation, limit: number): Promise<number[]>
   listSince(fromIso: string): Promise<{ logs: AiUsageLog[]; truncated: boolean }>
+  /** 上限の判定に使う、指定時刻以降の実行回数とトークン量 */
+  usageSince(fromIso: string): Promise<DailyUsage>
   listRecent(limit: number): Promise<AiUsageLog[]>
 }
 
@@ -116,6 +119,23 @@ export function createSupabaseAiUsageRepository(
 
       const rows = (data ?? []) as Row[]
       return { logs: rows.map(toLog), truncated: rows.length === MONTHLY_ROW_CAP }
+    },
+
+    async usageSince(fromIso) {
+      // 失敗した実行も回数に数える。数えないと、失敗し続ける処理が
+      // いくらでも呼べてしまい、そのぶんトークンは消費される
+      const { data, error } = await supabase
+        .from('ai_usage_logs')
+        .select('input_tokens, output_tokens')
+        .gte('created_at', fromIso)
+      if (error) throw error
+
+      const rows = (data ?? []) as { input_tokens: number; output_tokens: number }[]
+
+      return {
+        calls: rows.length,
+        tokens: rows.reduce((sum, row) => sum + row.input_tokens + row.output_tokens, 0),
+      }
     },
 
     async listRecent(limit) {
