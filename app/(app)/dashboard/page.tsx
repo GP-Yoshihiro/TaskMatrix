@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { AI_STUDIO_PLAN_URL } from '@/lib/domain/ai-plan'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 type RecentFile = {
@@ -18,9 +19,7 @@ type RecentFile = {
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 

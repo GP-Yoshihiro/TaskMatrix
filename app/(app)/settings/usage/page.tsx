@@ -15,6 +15,7 @@ import {
   MONTHLY_ROW_CAP,
   createSupabaseAiUsageRepository,
 } from '@/lib/repositories/ai-usage'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 /** 一覧に出す件数 */
@@ -38,9 +39,7 @@ const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
 
 export default async function UsagePage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 

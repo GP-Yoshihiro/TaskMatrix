@@ -36,6 +36,17 @@ async function handle(request: NextRequest) {
   if (!url || !anonKey) return response
 
   /*
+   * 保護対象でなければ、認証の問い合わせをしない。
+   *
+   * getUser() は毎回 Supabase へ往復する。ログイン画面・使い方・
+   * プライバシーポリシー・画像などでは、その答えを使う場面が無い。
+   * 通る経路のすべてで往復していては、体感が落ちるだけである。
+   */
+  if (!PROTECTED_PREFIXES.some((prefix) => request.nextUrl.pathname.startsWith(prefix))) {
+    return response
+  }
+
+  /*
    * 読み込みを関数の中で行う。
    *
    * 先頭で読み込むと、その読み込み自体が失敗したときに

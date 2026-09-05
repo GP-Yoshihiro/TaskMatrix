@@ -251,3 +251,21 @@ a:hover {
   font-weight: 600;
   color: var(--color-fg-muted);
 }
+
+/* 読み込み中の骨組み。止まっていないことを動きで伝える */
+@keyframes tm-skeleton {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 動きを抑える設定の利用者には点滅させない */
+@media (prefers-reduced-motion: reduce) {
+  [style*='tm-skeleton'] {
+    animation: none !important;
+  }
+}

@@ -2,13 +2,12 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
 import { createSupabaseProjectRepository } from '@/lib/repositories/projects'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 

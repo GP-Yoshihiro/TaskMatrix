@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useLinkStatus } from 'next/link'
 import { useState } from 'react'
 import {
   GLOBAL_NAV,
@@ -22,6 +23,31 @@ const sectionLabel = {
 } as const
 
 /** 移動先 1 つ分。現在地は背景で示す */
+/**
+ * 押した直後に出る印。
+ *
+ * 遷移先の読み込みが始まったことを、その場で示す。
+ * 押せたのか分からないまま待つのが、一番遅く感じる。
+ */
+function NavPending() {
+  const { pending } = useLinkStatus()
+  if (!pending) return null
+
+  return (
+    <span
+      aria-hidden
+      style={{
+        marginLeft: 'auto',
+        width: 6,
+        height: 6,
+        borderRadius: '50%',
+        background: 'var(--color-accent)',
+        animation: 'tm-skeleton 1s ease-in-out infinite',
+      }}
+    />
+  )
+}
+
 function NavLink({
   item,
   pathname,
@@ -61,6 +87,7 @@ function NavLink({
         {item.icon}
       </span>
       {item.label}
+      <NavPending />
     </Link>
   )
 }

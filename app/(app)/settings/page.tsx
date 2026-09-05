@@ -9,37 +9,39 @@ import { formatUsage } from '@/lib/domain/capacity'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
 import type { ThemePreference } from '@/lib/platform/theme'
+import { getCurrentUser } from '@/lib/supabase/current-user'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('theme, email, display_name, is_admin')
-    .eq('id', user.id)
-    .maybeSingle()
+  // 互いに依存しない 3 つの取得。順に待つと待ち時間が足し算になる
+  const [profileResult, storedSettings, usage] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('theme, email, display_name, is_admin')
+      .eq('id', user.id)
+      .maybeSingle(),
+    createSupabaseWorkSettingsRepository(supabase).find(user.id),
+    // 読めなくても設定画面は出す（表示は補助的な情報のため）
+    (async (): Promise<string | null> => {
+      try {
+        const { data } = await supabase.rpc('database_size_bytes')
+        return formatUsage(Number(data ?? 0))
+      } catch {
+        return null
+      }
+    })(),
+  ])
 
+  const profile = profileResult.data
   const current = (profile?.theme ?? 'auto') as ThemePreference
 
   // 未設定の利用者には既定値を表示する
-  const workSettings =
-    (await createSupabaseWorkSettingsRepository(supabase).find(user.id)) ??
-    DEFAULT_WORK_SETTINGS
-
-  // 読めなくても設定画面は出す（表示は補助的な情報のため）
-  let usage: string | null = null
-  try {
-    const { data } = await supabase.rpc('database_size_bytes')
-    usage = formatUsage(Number(data ?? 0))
-  } catch {
-    usage = null
-  }
+  const workSettings = storedSettings ?? DEFAULT_WORK_SETTINGS
 
   return (
     <div style={{ display: 'grid', gap: 24, maxWidth: 680 }}>
