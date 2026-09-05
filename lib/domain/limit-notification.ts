@@ -5,16 +5,6 @@
  * 子が上限に達して機能が止まったことを、親が知る手立てが要る。
  */
 
-/**
- * 利用枠を増やすときに開く画面。
- *
- * 定数を 1 か所に置く。飛び先が変わったときに探し回らずに済むようにするため。
- * （Google AI Studio は画面遷移を JavaScript で行うため、
- * この URL が意図した画面に着くかを機械的には確かめられない。
- * 実際に開いて違っていれば、ここだけ差し替えること）
- */
-export const AI_STUDIO_PLAN_URL = 'https://aistudio.google.com/app/plan_information'
-
 /** 何の上限に達したか */
 export type LimitReason = 'calls' | 'tokens'
 

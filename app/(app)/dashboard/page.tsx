@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { LimitAlert } from '@/components/features/dashboard/limit-alert'
 import { PageHeader } from '@/components/layout/page-header'
 import { Card } from '@/components/ui/card'
+import { AI_STUDIO_PLAN_URL } from '@/lib/domain/ai-plan'
 import { MAX_PROJECTS_PER_USER } from '@/lib/domain/projects'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
     <div style={{ display: 'grid', gap: 24 }}>
       <PageHeader title="ホーム" description="最近の動きと、プロジェクトの数です。" />
 
-      <LimitAlert notices={notices} />
+      <LimitAlert notices={notices} planUrl={AI_STUDIO_PLAN_URL} />
 
       <Card style={{ display: 'grid', gap: 4 }}>
         <span style={{ color: 'var(--color-fg-muted)', fontSize: '0.85rem' }}>プロジェクト</span>

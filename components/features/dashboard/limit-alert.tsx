@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { markLimitNoticesReadAction } from '@/lib/actions/limit-notifications'
 import { callAction } from '@/lib/client/safe-action'
-import { AI_STUDIO_PLAN_URL, noticeMessage } from '@/lib/domain/limit-notification'
+import { noticeMessage } from '@/lib/domain/limit-notification'
 import type { LimitNotice } from '@/lib/repositories/limit-notifications'
 
 const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
@@ -24,7 +24,20 @@ const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
  * 「誰が」「何の上限で」止まっているのかが分からないと手の打ちようがない。
  * 枠を増やす画面への導線もここに置く。
  */
-export function LimitAlert({ notices }: { notices: LimitNotice[] }) {
+export function LimitAlert({
+  notices,
+  planUrl,
+}: {
+  notices: LimitNotice[]
+  /**
+   * 利用枠を増やす画面。値として受け取る。
+   *
+   * URL に Google Cloud のプロジェクト ID が含まれるため、
+   * ここで定数として持つと全利用者のブラウザへ配られてしまう。
+   * 管理者向けに描くときにだけ渡す。
+   */
+  planUrl: string
+}) {
   const [dismissed, setDismissed] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -76,7 +89,7 @@ export function LimitAlert({ notices }: { notices: LimitNotice[] }) {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <a
-          href={AI_STUDIO_PLAN_URL}
+          href={planUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{ fontSize: '0.85rem', fontWeight: 600 }}

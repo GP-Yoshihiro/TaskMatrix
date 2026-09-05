@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { AI_STUDIO_PLAN_URL, jstDateKey, noticeMessage } from '../limit-notification'
+import { AI_STUDIO_PLAN_URL } from '../ai-plan'
+import { jstDateKey, noticeMessage } from '../limit-notification'
 
 describe('jstDateKey', () => {
   it('日本時間の日付を返す', () => {
@@ -30,5 +31,12 @@ describe('AI_STUDIO_PLAN_URL', () => {
   it('Google の正規のドメインを指す', () => {
     // 差し替えの際に、別のドメインへ向けてしまわないように
     expect(new URL(AI_STUDIO_PLAN_URL).origin).toBe('https://aistudio.google.com')
+  })
+
+  it('クライアント側の部品から読み込まれていない', async () => {
+    // 読み込むと、URL に含まれるプロジェクト ID が全利用者へ配られる
+    const { readFile } = await import('node:fs/promises')
+    const source = await readFile('components/features/dashboard/limit-alert.tsx', 'utf8')
+    expect(source).not.toContain('ai-plan')
   })
 })
