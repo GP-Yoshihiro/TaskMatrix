@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { decideProtectedRouteAction, isConnectivityFailure } from '@/lib/domain/auth'
+import { buildSecurityHeaders } from '@/lib/domain/security-headers'
 
 /** 保護対象のパス接頭辞 */
 const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/settings']
@@ -12,16 +13,60 @@ const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/settings']
  * 何が起きているのかを確かめる手段まで失われる。
  */
 export async function updateSession(request: NextRequest) {
+  /*
+   * 要求ごとに使い捨ての印を作る。
+   *
+   * これが付いた script だけを実行させる。推測できると意味が無いので、
+   * 毎回作り直す。
+   */
+  const nonce = crypto.randomUUID().replace(/-/g, '')
+
   try {
-    return await handle(request)
+    const response = await handle(request, nonce)
+    applySecurityHeaders(response, request, nonce)
+    return response
   } catch {
     // セッションの更新だけを諦めて通す。原因は /api/health で確かめられる
-    return NextResponse.next({ request })
+    const fallback = NextResponse.next({ request })
+    applySecurityHeaders(fallback, request, nonce)
+    return fallback
   }
 }
 
-async function handle(request: NextRequest) {
-  let response = NextResponse.next({ request })
+/**
+ * 防御用のヘッダーを付ける。
+ *
+ * **すべての応答に付ける。** 保護対象かどうかに関わらず、
+ * 埋め込みや差し込みは起こりうる。
+ */
+function applySecurityHeaders(
+  response: NextResponse,
+  request: NextRequest,
+  nonce: string,
+): void {
+  let supabaseOrigin = ''
+  try {
+    const raw = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (raw) supabaseOrigin = new URL(raw).origin
+  } catch {
+    // 解析できなければ通信先を足さない。足りなければ画面が動かないので気付ける
+  }
+
+  const headers = buildSecurityHeaders({
+    nonce,
+    supabaseOrigin,
+    isProduction: process.env.NODE_ENV === 'production',
+  })
+
+  for (const [name, value] of headers) response.headers.set(name, value)
+}
+
+async function handle(request: NextRequest, nonce: string) {
+  // 画面側が印を読めるようにする。Next はこれを script に付ける
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } })
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -66,7 +111,7 @@ async function handle(request: NextRequest) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value)
           }
-          response = NextResponse.next({ request })
+          response = NextResponse.next({ request: { headers: requestHeaders } })
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options)
           }
