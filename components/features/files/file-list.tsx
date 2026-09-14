@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import { MultiFileExtractPanel } from '@/components/features/files/multi-file-extract-panel'
+import { toggleAll, toggleOne } from '@/lib/domain/selection'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -24,9 +26,13 @@ export function FileList({
   files: ProjectFile[]
 }) {
   const [target, setTarget] = useState<ProjectFile | null>(null)
+  /** まとめて抽出するために選んだファイル */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  const fileIds = files.map((file) => file.id)
 
   function handleConfirm() {
     if (!target) return
@@ -81,6 +87,16 @@ export function FileList({
           {message}
         </p>
       )}
+      {files.length > 0 && (
+        <MultiFileExtractPanel
+          projectId={projectId}
+          files={files.map((file) => ({ id: file.id, name: file.name }))}
+          selected={selected}
+          onToggleAll={() => setSelected((current) => toggleAll(current, fileIds))}
+          onDone={() => setSelected(new Set())}
+        />
+      )}
+
       <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 8 }}>
         {files.map((file) => (
           <li
@@ -98,9 +114,23 @@ export function FileList({
               background: 'var(--color-surface)',
             }}
           >
-            <Link href={`/projects/${projectId}/files/${file.id}`} style={{ fontWeight: 500 }}>
-              📄 {file.name}
-            </Link>
+            <span style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
+              {/* まとめて抽出するための選択 */}
+              <input
+                type="checkbox"
+                checked={selected.has(file.id)}
+                onChange={() => setSelected((current) => toggleOne(current, file.id))}
+                disabled={isPending}
+                aria-label={`ファイル「${file.name}」を選択`}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <Link
+                href={`/projects/${projectId}/files/${file.id}`}
+                style={{ fontWeight: 500 }}
+              >
+                📄 {file.name}
+              </Link>
+            </span>
             <span style={{ fontSize: '0.78rem', color: 'var(--color-fg-muted)' }}>
               v{file.currentVersion} / {(file.size / 1024).toFixed(1)} KB
             </span>
