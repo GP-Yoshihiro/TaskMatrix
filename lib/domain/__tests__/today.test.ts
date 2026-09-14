@@ -12,6 +12,8 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     sourceVersion: null,
     assigneeMemberId: null,
     assigneeMemberName: null,
+    estimatedDays: null,
+    estimateSource: '' as const,
     title: `タスク${overrides.id}`,
     description: '',
     status: 'todo',

@@ -19,6 +19,8 @@ export type SchedulePromptInput = {
     description: string
     priority: 'high' | 'medium' | 'low'
     dueDate: string | null
+    /** 想定日程（日）。未設定は null */
+    estimatedDays: number | null
   }[]
   confirmed: { taskTitle: string; startsAt: string; endsAt: string }[]
 }
@@ -73,6 +75,8 @@ export function buildSchedulePrompt(input: SchedulePromptInput): string {
         `- ${task.title}`,
         `優先度: ${PRIORITY_LABELS[task.priority]}`,
         `期限: ${task.dueDate ?? '未定'}`,
+        // 何日かかるかを明示する。無いと AI が毎回別の長さで組んでしまう
+        `想定日程: ${task.estimatedDays === null ? '未設定' : `${task.estimatedDays} 日`}`,
       ]
       if (task.description) parts.push(`説明: ${task.description}`)
       return parts.join(' / ')
@@ -105,8 +109,11 @@ ${taskLines}
 出力の決まり:
 - starts_at と ends_at は ISO 8601 形式でタイムゾーンを付けてください（例 2026-09-01T09:00:00+09:00）。
 - 稼働する曜日と稼働時間帯の中に収めてください。1 つの予定が日をまたがないようにしてください。
-- 所要時間はタスクの内容から推定してください。1 日の上限を超えないように分割せず、
-  収まらない場合は別の日に配置してください。
+- 所要時間は**想定日程に従ってください**。想定日程が 1 日なら 1 日分、
+  2.5 日なら 2.5 日分の作業量として扱います。
+  想定日程が「未設定」のタスクに限り、内容から推定してください。
+- 想定日程が 1 日を超えるタスクは、**複数の日に分けて配置**してください。
+  1 日の上限を超える予定を 1 つにまとめないでください。
 - weight は次の 5 段階から選んでください。
   very_heavy（非常に重い）/ heavy（重い）/ normal（標準）/ light（軽い）/ very_light（非常に軽い）
 - weight は優先度と推定作業工数の組み合わせで決めてください。

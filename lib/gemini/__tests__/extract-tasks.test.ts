@@ -43,6 +43,8 @@ describe('EXTRACTION_SCHEMA', () => {
       'assignee',
       'description',
       'due_date',
+      'estimate_source',
+      'estimated_days',
       'priority',
       'title',
     ])

@@ -48,6 +48,8 @@ const aiTask = {
   due_date: '来週まで',
   ambiguity_note: '「来週」が不明確です。',
   ai_suggestion: '期限を日付で決めてください。',
+  estimated_days: 1,
+  estimate_source: 'inferred' as const,
 }
 
 type Deps = {

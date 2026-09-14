@@ -117,6 +117,8 @@ export async function registerTasksAction(formData: FormData): Promise<Result<nu
         dueDate: suggestion.dueDate,
         ambiguityNote: suggestion.ambiguityNote,
         aiSuggestion: suggestion.aiSuggestion,
+        estimatedDays: suggestion.estimatedDays,
+        estimateSource: suggestion.estimateSource,
         origin: 'ai' as const,
         createdBy: user.id,
       })),

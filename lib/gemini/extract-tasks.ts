@@ -9,6 +9,10 @@ export type ExtractedTask = {
   due_date: string
   ambiguity_note: string
   ai_suggestion: string
+  /** 想定日程（日）。0.5 刻み。分からなければ 0 */
+  estimated_days: number
+  /** 想定日程の出どころ */
+  estimate_source: 'document' | 'inferred' | ''
 }
 
 /** Gemini の構造化出力に渡す JSON スキーマ */
@@ -39,6 +43,17 @@ export const EXTRACTION_SCHEMA = {
             type: 'string',
             description: 'タスク化に向けた改善案。なければ空文字',
           },
+          estimated_days: {
+            type: 'number',
+            description:
+              '想定日程（日）。0.5 刻み。稼働 8 時間を 1 日、稼働 5 日を 1 週として換算する',
+          },
+          estimate_source: {
+            type: 'string',
+            enum: ['document', 'inferred'],
+            description:
+              'document=文書に日数・時間・週の記載があった / inferred=作業内容から推定した',
+          },
         },
         required: [
           'title',
@@ -48,6 +63,8 @@ export const EXTRACTION_SCHEMA = {
           'due_date',
           'ambiguity_note',
           'ai_suggestion',
+          'estimated_days',
+          'estimate_source',
         ],
       },
     },
@@ -68,6 +85,12 @@ export function buildPrompt(text: string): string {
 - assignee は文書から明確に読み取れる場合のみ書き、不明なら空文字にしてください。
 - 記述が不透明でタスクとして実行できない点があれば ambiguity_note に指摘してください。
 - タスクとして成立させるための具体的な改善案を ai_suggestion に書いてください。
+- estimated_days には、そのタスクに何日かかるかを 0.5 刻みで書いてください。
+  文書に日数・時間・週の記載があればそれを使い、estimate_source を "document" にしてください。
+  記載が無い場合は**作業内容から妥当な日数を見積もり**、
+  estimate_source を "inferred" にしてください。
+  換算は稼働 8 時間を 1 日、稼働 5 日を 1 週とします。
+  「9月14日まで」のような期限は所要日数ではありません。混同しないでください。
 - タスクが見当たらない場合は tasks を空配列にしてください。推測でタスクを作らないでください。
 
 ドキュメント:
@@ -84,6 +107,9 @@ const taskSchema = z.object({
   due_date: z.string(),
   ambiguity_note: z.string(),
   ai_suggestion: z.string(),
+  // 応答に欠けていても抽出そのものは通す。既定は未設定として扱う
+  estimated_days: z.number().optional().default(0),
+  estimate_source: z.enum(['document', 'inferred']).optional().default('inferred'),
 })
 
 const responseSchema = z.object({

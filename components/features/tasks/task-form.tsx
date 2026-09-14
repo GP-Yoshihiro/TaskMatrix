@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ESTIMATE_STEP } from '@/lib/domain/estimate-days'
 import { createTaskAction, updateTaskAction } from '@/lib/actions/tasks'
 import {
   PRIORITY_LABEL,
@@ -149,6 +150,23 @@ export function TaskForm({
             <Input name="assignee" defaultValue={task?.assignee ?? ''} disabled={isPending} />
             <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
               名簿から選んだ場合は、そちらが使われます。
+            </span>
+          </label>
+
+          <label style={{ display: 'grid', gap: 4 }}>
+            <span style={labelStyle}>想定日程（日）</span>
+            <Input
+              name="estimatedDays"
+              type="number"
+              min={0}
+              step={ESTIMATE_STEP}
+              defaultValue={task?.estimatedDays ?? ''}
+              disabled={isPending}
+            />
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+              0.5 日刻み。空欄なら未設定です。
+              {task?.estimateSource === 'inferred' && '（現在の値は AI の推定です）'}
+              {task?.estimateSource === 'document' && '（現在の値は資料の記載です）'}
             </span>
           </label>
 

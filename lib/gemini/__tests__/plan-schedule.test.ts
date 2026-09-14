@@ -15,6 +15,7 @@ const promptInput = {
       description: '',
       priority: 'high' as const,
       dueDate: '2026-09-10',
+      estimatedDays: 2,
     },
   ],
   confirmed: [
