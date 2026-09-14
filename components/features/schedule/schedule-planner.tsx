@@ -9,6 +9,8 @@ import {
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import { CalendarView } from '@/components/features/schedule/calendar-view'
 import { OverwriteConfirmDialog } from '@/components/features/schedule/overwrite-confirm-dialog'
+import { PlanTaskPicker } from '@/components/features/schedule/plan-task-picker'
+import { MAX_PLAN_TASKS, needsSelection } from '@/lib/domain/plan-selection'
 import { TaskDetailDialog } from '@/components/features/schedule/task-detail-dialog'
 import type { Task } from '@/lib/repositories/tasks'
 import { type Conflict, ScheduleDraftItem } from '@/components/features/schedule/schedule-draft-item'
@@ -77,6 +79,8 @@ export function SchedulePlanner({
   const [overwriteOpen, setOverwriteOpen] = useState(false)
   /** 詳細を開いているタスク。null なら閉じている */
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  /** 算出の対象。空なら全件（上限まで） */
+  const [planTargets, setPlanTargets] = useState<Set<string>>(new Set())
   // 算出だけを進捗表示の対象にする。確定の保存は AI を呼ばず一瞬で終わるため
   const [planning, setPlanning] = useState(false)
   const [lastRun, setLastRun] = useState<{ usage: AiUsage; durationMs: number } | null>(
@@ -126,6 +130,11 @@ export function SchedulePlanner({
     ).map((item) => ({ id: item.id, label: item.label, kind: item.kind }))
   }
 
+  /** 算出の対象になりうるタスク。多いときは選んでもらう */
+  const pendingTasks = tasks.filter((task) => task.status !== 'done')
+  const mustPick = needsSelection(pendingTasks.length)
+  const pickedCount = pendingTasks.filter((task) => planTargets.has(task.id)).length
+
   const selectedDrafts = (drafts ?? []).filter((draft) => selected.has(draft.key))
 
   /** 選んだ仮案のうち、同じタスクに既存の予定があるもの */
@@ -169,8 +178,10 @@ export function SchedulePlanner({
   }))
 
   function handlePlan() {
+    const target = pickedCount > 0 ? `${pickedCount} 件` : `${pendingTasks.length} 件`
     const agreed = window.confirm(
-      '未完了タスクの一覧（タスク名・説明・優先度・期限）と稼働条件、\n' +
+      `対象 ${target} のタスクについて算出します。\n` +
+        '未完了タスクの一覧（タスク名・説明・優先度・期限）と稼働条件、\n' +
         '確定済みの予定を Google Gemini API に送信してスケジュールを算出します。\n' +
         'ファイルの本文やプロジェクト名は送信しません。\n\n' +
         '実行してよろしいですか？',
@@ -185,6 +196,8 @@ export function SchedulePlanner({
 
     const formData = new FormData()
     formData.set('projectId', projectId)
+    // 選んでいなければ空。処理側が全件（上限まで）として扱う
+    formData.set('taskIds', JSON.stringify([...planTargets]))
 
     startTransition(async () => {
       const result = await callAction(() => planScheduleAction(formData))
@@ -293,7 +306,13 @@ export function SchedulePlanner({
         <h2 className="tm-h2">スケジュール算出</h2>
         <Button
           onClick={handlePlan}
-          disabled={isPending || pendingTaskCount === 0 || aiLimit?.allowed === false}
+          disabled={
+            isPending ||
+            pendingTaskCount === 0 ||
+            aiLimit?.allowed === false ||
+            // 多いときは選んでもらう。選ばずに押させて失敗させない
+            (mustPick && (pickedCount === 0 || pickedCount > MAX_PLAN_TASKS))
+          }
         >
           {planning ? '処理中…' : 'スケジュールを算出'}
         </Button>
@@ -353,6 +372,15 @@ export function SchedulePlanner({
           </span>
         )}
       </div>
+
+      {mustPick && (
+        <PlanTaskPicker
+          tasks={pendingTasks}
+          selected={planTargets}
+          onChange={setPlanTargets}
+          disabled={isPending}
+        />
+      )}
 
       <CalendarView
         entries={calendarEntries}

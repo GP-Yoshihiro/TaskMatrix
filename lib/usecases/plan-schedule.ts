@@ -1,5 +1,6 @@
 import { type Result, err, ok } from '@/lib/domain/result'
 import { matchTaskTitle } from '@/lib/domain/match-task-title'
+import { pickTasksToPlan, validatePlanSelection } from '@/lib/domain/plan-selection'
 import type { AiUsage } from '@/lib/domain/usage'
 import {
   DEFAULT_WORK_SETTINGS,
@@ -57,13 +58,31 @@ export type PlanScheduleOutput = {
  */
 export async function planScheduleForProject(
   deps: Deps,
-  input: { projectId: string; userId: string; today: string },
+  input: {
+    projectId: string
+    userId: string
+    today: string
+    /** 算出の対象。空なら全件（上限まで） */
+    selectedTaskIds?: string[]
+  },
 ): Promise<Result<PlanScheduleOutput>> {
   const allTasks = await deps.tasks.listByProject(input.projectId)
-  const pending = allTasks.filter((task) => task.status !== 'done')
+  const notDone = allTasks.filter((task) => task.status !== 'done')
+
+  if (notDone.length === 0) {
+    return err('NO_SCHEDULABLE_TASKS', '予定を立てるタスクがありません。')
+  }
+
+  const selectedTaskIds = input.selectedTaskIds ?? []
+
+  // 多すぎると AI の応答が持ち時間に収まらず中断する
+  const valid = validatePlanSelection(selectedTaskIds, notDone.length)
+  if (!valid.ok) return valid
+
+  const pending = pickTasksToPlan(notDone, selectedTaskIds)
 
   if (pending.length === 0) {
-    return err('NO_SCHEDULABLE_TASKS', '予定を立てるタスクがありません。')
+    return err('NO_SCHEDULABLE_TASKS', '算出するタスクを選んでください。')
   }
 
   const settings =
