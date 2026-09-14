@@ -37,6 +37,7 @@ function schedule(taskId: string, startsAt: string, endsAt: string): Schedule {
     endsAt,
     reason: '',
     weight: 'normal',
+    googleEventId: '',
   }
 }
 

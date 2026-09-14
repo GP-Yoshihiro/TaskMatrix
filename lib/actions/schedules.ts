@@ -5,8 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
 import { type Result, err, ok } from '@/lib/domain/result'
+import { overwriteTargetIds } from '@/lib/domain/schedule-overwrite'
 import { isTaskWeight } from '@/lib/domain/schedule'
 import type { WithUsage } from '@/lib/domain/usage'
+import { deleteEvent } from '@/lib/google/calendar'
 import { createGeminiSchedulePlanner } from '@/lib/gemini/plan-schedule-client'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/google-connections'
@@ -89,6 +91,34 @@ export async function planScheduleAction(
   }
 }
 
+/**
+ * Google 側の予定を消す。
+ *
+ * 失敗しても確定は止めない。連携の不調で予定を確定できなくなるのは
+ * 本末転倒であり、残った予定は利用者がカレンダーから消せる。
+ */
+async function removeFromGoogle(
+  supabase: SupabaseClient,
+  userId: string,
+  eventIds: string[],
+): Promise<void> {
+  if (eventIds.length === 0) return
+
+  try {
+    const session = await openGoogleSession(
+      createSupabaseGoogleConnectionRepository(supabase),
+      userId,
+    )
+    if (!session.ok) return
+
+    for (const eventId of eventIds) {
+      await deleteEvent(session.data.accessToken, session.data.calendarId, eventId)
+    }
+  } catch {
+    // 消せなくても確定は続ける
+  }
+}
+
 export async function confirmSchedulesAction(formData: FormData): Promise<Result<number>> {
   const projectId = String(formData.get('projectId') ?? '')
   const payload = String(formData.get('drafts') ?? '[]')
@@ -122,7 +152,36 @@ export async function confirmSchedulesAction(formData: FormData): Promise<Result
   } = await supabase.auth.getUser()
   if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
 
+  // 同じタスクの既存の予定を置き換えるか。画面で確認済みの意思を受け取る
+  const overwrite = String(formData.get('overwrite') ?? '') === 'true'
+
   try {
+    const schedules = createSupabaseScheduleRepository(supabase)
+
+    if (overwrite) {
+      const confirmed = await schedules.listByProject(projectId)
+      const targets = overwriteTargetIds(
+        drafts.map((draft) => ({
+          key: draft.key,
+          taskId: draft.taskId,
+          taskTitle: draft.taskTitle,
+        })),
+        confirmed.map((schedule) => ({
+          id: schedule.id,
+          taskId: schedule.taskId,
+          taskTitle: schedule.taskTitle,
+          googleEventId: schedule.googleEventId,
+        })),
+      )
+
+      if (targets.length > 0) {
+        // 先に Google 側を消す。行を消してからでは識別子が辿れなくなり、
+        // カレンダーに古い予定が残り続ける
+        await removeFromGoogle(supabase, user.id, await schedules.googleEventIdsOf(targets))
+        await schedules.removeMany(targets)
+      }
+    }
+
     const count = await createSupabaseScheduleRepository(supabase).createMany(
       drafts.map((draft) => ({
         projectId,

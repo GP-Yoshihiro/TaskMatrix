@@ -10,6 +10,8 @@ export type Schedule = {
   endsAt: string
   reason: string
   weight: TaskWeight
+  /** Google へ送済みならその識別子。未送信は空文字 */
+  googleEventId: string
 }
 
 export type ScheduleInput = {
@@ -36,6 +38,10 @@ export interface ScheduleRepository {
   ): Promise<{ id: string; googleEventId: string; startsAt: string; endsAt: string }[]>
   updateTimes(id: string, input: { startsAt: string; endsAt: string }): Promise<void>
   remove(id: string): Promise<void>
+  /** 置き換えのために、指定した予定をまとめて消す */
+  removeMany(ids: string[]): Promise<void>
+  /** 置き換えの前に、Google へ送済みの識別子を集める */
+  googleEventIdsOf(ids: string[]): Promise<string[]>
 }
 
 type Row = {
@@ -46,11 +52,12 @@ type Row = {
   ends_at: string
   reason: string
   weight: TaskWeight
+  google_event_id: string | null
   tasks: { title: string } | null
 }
 
 const COLUMNS =
-  'id, project_id, task_id, starts_at, ends_at, reason, weight, tasks(title)'
+  'id, project_id, task_id, starts_at, ends_at, reason, weight, google_event_id, tasks(title)'
 
 function toSchedule(row: Row): Schedule {
   return {
@@ -62,6 +69,7 @@ function toSchedule(row: Row): Schedule {
     endsAt: row.ends_at,
     reason: row.reason,
     weight: row.weight,
+    googleEventId: row.google_event_id ?? '',
   }
 }
 
@@ -166,6 +174,27 @@ export function createSupabaseScheduleRepository(
         })
         .eq('id', id)
       if (error) throw error
+    },
+
+    async removeMany(ids) {
+      if (ids.length === 0) return
+      const { error } = await supabase.from('schedules').delete().in('id', ids)
+      if (error) throw error
+    },
+
+    async googleEventIdsOf(ids) {
+      if (ids.length === 0) return []
+
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('google_event_id')
+        .in('id', ids)
+        .not('google_event_id', 'is', null)
+      if (error) throw error
+
+      return ((data ?? []) as { google_event_id: string | null }[])
+        .map((row) => row.google_event_id)
+        .filter((id): id is string => Boolean(id))
     },
 
     async remove(id) {

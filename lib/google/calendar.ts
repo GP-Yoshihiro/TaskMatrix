@@ -25,6 +25,8 @@ export type GoogleFailure =
   | 'reconnect_required'
   /** 差分同期の印が古い。全件を取り直す */
   | 'sync_token_expired'
+  /** 対象が見つからない。削除では「既に無い」を意味する */
+  | 'not_found'
   | 'request_failed'
 
 export type GoogleResult<T> =
@@ -171,6 +173,9 @@ async function callApi(
 
     if (response.status === 401) return fail('reconnect_required', 'api 401')
 
+    // 既に消えている。削除の呼び出しでは、望む状態になっている
+    if (response.status === 404) return fail('not_found')
+
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as {
         error?: { message?: string; errors?: { reason?: string }[] }
@@ -217,6 +222,34 @@ export async function insertEvent(
 
   const id = String(result.data.id ?? '')
   return id ? { ok: true, data: id } : fail('request_failed')
+}
+
+/**
+ * 予定を消す。
+ *
+ * すでに無い場合（410/404）も**成功として扱う**。
+ * 目的は「その予定が残っていないこと」であり、
+ * 手元の記録と Google 側がずれていても、結果は同じになる。
+ */
+export async function deleteEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+): Promise<GoogleResult<null>> {
+  const result = await callApi(
+    accessToken,
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE' },
+  )
+
+  if (result.ok) return { ok: true, data: null }
+
+  // 既に無いものを消せなくても、望む状態にはなっている
+  if (result.failure === 'not_found' || result.failure === 'sync_token_expired') {
+    return { ok: true, data: null }
+  }
+
+  return result
 }
 
 export type RemoteChange = {

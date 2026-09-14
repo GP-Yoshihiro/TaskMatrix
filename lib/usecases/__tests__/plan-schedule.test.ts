@@ -35,6 +35,7 @@ const goodProposal = {
   ends_at: '2026-09-01T11:00:00+09:00',
   reason: '期限まで余裕があるうちに着手するため。',
   weight: 'heavy' as const,
+  googleEventId: '',
   overlap_acceptable: false,
 }
 
@@ -58,6 +59,8 @@ function makeDeps(overrides: {
     setGoogleEventId: vi.fn(async () => {}),
     findByGoogleEventIds: vi.fn(async () => []),
     updateTimes: vi.fn(async () => {}),
+    removeMany: vi.fn(async () => {}),
+    googleEventIdsOf: vi.fn(async () => []),
     remove: vi.fn(async () => {}),
   }
 
@@ -227,6 +230,7 @@ describe('planScheduleForProject', () => {
         endsAt: '2026-09-01T11:00:00+09:00',
         reason: '',
         weight: 'normal' as const,
+        googleEventId: '',
       },
     ])
     await planScheduleForProject(deps, input)
@@ -248,6 +252,7 @@ describe('planScheduleForProject', () => {
         endsAt: '2026-09-01T11:00:00+09:00',
         reason: '',
         weight: 'normal' as const,
+        googleEventId: '',
       },
     ])
     const result = await planScheduleForProject(deps, input)
