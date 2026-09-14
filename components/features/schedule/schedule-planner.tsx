@@ -8,7 +8,9 @@ import {
 } from '@/components/features/schedule/overlap-warning-dialog'
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import { CalendarView } from '@/components/features/schedule/calendar-view'
+import { OverwriteConfirmDialog } from '@/components/features/schedule/overwrite-confirm-dialog'
 import { type Conflict, ScheduleDraftItem } from '@/components/features/schedule/schedule-draft-item'
+import { findDuplicateTasks } from '@/lib/domain/schedule-overwrite'
 import { AiProgress } from '@/components/ui/ai-progress'
 import { AiUsageNote } from '@/components/ui/ai-usage-note'
 import { Button } from '@/components/ui/button'
@@ -60,6 +62,7 @@ export function SchedulePlanner({
   const [note, setNote] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [warningOpen, setWarningOpen] = useState(false)
+  const [overwriteOpen, setOverwriteOpen] = useState(false)
   // 算出だけを進捗表示の対象にする。確定の保存は AI を呼ばず一瞬で終わるため
   const [planning, setPlanning] = useState(false)
   const [lastRun, setLastRun] = useState<{ usage: AiUsage; durationMs: number } | null>(
@@ -107,6 +110,21 @@ export function SchedulePlanner({
   }
 
   const selectedDrafts = (drafts ?? []).filter((draft) => selected.has(draft.key))
+
+  /** 選んだ仮案のうち、同じタスクに既存の予定があるもの */
+  const duplicates = findDuplicateTasks(
+    selectedDrafts.map((draft) => ({
+      key: draft.key,
+      taskId: draft.taskId,
+      taskTitle: draft.taskTitle,
+    })),
+    confirmed.map((schedule) => ({
+      id: schedule.id,
+      taskId: schedule.taskId,
+      taskTitle: schedule.taskTitle,
+      googleEventId: schedule.googleEventId ?? '',
+    })),
+  )
 
   /** 確定対象に含まれる仮案の重複だけを集める */
   const overlapPairs: OverlapPair[] = selectedDrafts.flatMap((draft) =>
@@ -185,14 +203,17 @@ export function SchedulePlanner({
     })
   }
 
-  function save() {
+  /** 確定する。`overwrite` が真なら、同じタスクの既存の予定を置き換える */
+  function save(overwrite = false) {
     const formData = new FormData()
     formData.set('projectId', projectId)
     formData.set('drafts', JSON.stringify(selectedDrafts))
+    formData.set('overwrite', overwrite ? 'true' : 'false')
 
     startTransition(async () => {
       const result = await callAction(() => confirmSchedulesAction(formData))
       setWarningOpen(false)
+      setOverwriteOpen(false)
       if (result.ok) {
         setMessage(`${result.data} 件の予定を確定しました。`)
         setDrafts(null)
@@ -212,6 +233,22 @@ export function SchedulePlanner({
     }
     if (overlapPairs.length > 0) {
       setWarningOpen(true)
+      return
+    }
+    // 同じタスクに既存の予定があれば、置き換えるかを先に確かめる。
+    // そのまま確定すると、同じタスクの予定が二重に増える
+    if (duplicates.length > 0) {
+      setOverwriteOpen(true)
+      return
+    }
+    save()
+  }
+
+  /** 重なりの警告を通したあと。ここでも重複の確認は挟む */
+  function handleAfterOverlap() {
+    setWarningOpen(false)
+    if (duplicates.length > 0) {
+      setOverwriteOpen(true)
       return
     }
     save()
@@ -313,8 +350,17 @@ export function SchedulePlanner({
         open={warningOpen}
         pairs={overlapPairs}
         pending={isPending}
-        onConfirm={save}
+        onConfirm={handleAfterOverlap}
         onCancel={() => setWarningOpen(false)}
+      />
+
+      <OverwriteConfirmDialog
+        open={overwriteOpen}
+        duplicates={duplicates}
+        pending={isPending}
+        onOverwrite={() => save(true)}
+        onKeepBoth={() => save(false)}
+        onCancel={() => setOverwriteOpen(false)}
       />
     </section>
   )
