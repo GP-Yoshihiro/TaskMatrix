@@ -11,6 +11,10 @@ export type Task = {
   status: TaskStatus
   priority: TaskPriority
   assignee: string
+  /** 名簿のメンバー。選ばれていなければ null */
+  assigneeMemberId: string | null
+  /** 表示用のメンバー名。参照が切れていれば null */
+  assigneeMemberName: string | null
   dueDate: string | null
   ambiguityNote: string
   aiSuggestion: string
@@ -20,6 +24,8 @@ export type Task = {
 }
 
 export type TaskInput = {
+  /** 名簿からの担当。AI 抽出では決まらないため null */
+  assigneeMemberId?: string | null
   projectId: string
   sourceFileId: string | null
   sourceVersion: number | null
@@ -35,6 +41,8 @@ export type TaskInput = {
 }
 
 export type TaskPatch = Partial<{
+  /** null を渡すと、名簿からの担当を外す */
+  assigneeMemberId: string | null
   title: string
   description: string
   status: TaskStatus
@@ -61,6 +69,9 @@ type Row = {
   status: TaskStatus
   priority: TaskPriority
   assignee: string
+  assignee_member_id: string | null
+  /** 結合結果。PostgREST は配列で返す */
+  project_members: { name: string }[] | { name: string } | null
   due_date: string | null
   ambiguity_note: string
   ai_suggestion: string
@@ -70,7 +81,16 @@ type Row = {
 }
 
 const COLUMNS =
-  'id, project_id, source_file_id, source_version, title, description, status, priority, assignee, due_date, ambiguity_note, ai_suggestion, origin, position, updated_at'
+  'id, project_id, source_file_id, source_version, title, description, status, priority, assignee, assignee_member_id, project_members(name), due_date, ambiguity_note, ai_suggestion, origin, position, updated_at'
+
+/** 結合結果から名前を取り出す。配列でも単体でも受ける */
+function memberNameOf(
+  joined: { name: string }[] | { name: string } | null,
+): string | null {
+  if (!joined) return null
+  if (Array.isArray(joined)) return joined[0]?.name ?? null
+  return joined.name
+}
 
 function toTask(row: Row): Task {
   return {
@@ -83,6 +103,8 @@ function toTask(row: Row): Task {
     status: row.status,
     priority: row.priority,
     assignee: row.assignee,
+    assigneeMemberId: row.assignee_member_id,
+    assigneeMemberName: memberNameOf(row.project_members),
     dueDate: row.due_date,
     ambiguityNote: row.ambiguity_note,
     aiSuggestion: row.ai_suggestion,
@@ -107,7 +129,8 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
         .order('position')
         .order('updated_at', { ascending: false })
       if (error) throw error
-      return (data as Row[]).map(toTask)
+      // 結合した project_members は配列で返るため、いったん unknown を挟む
+      return (data as unknown as Row[]).map(toTask)
     },
 
     async createMany(inputs) {
@@ -121,6 +144,7 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
           description: input.description,
           priority: input.priority,
           assignee: input.assignee,
+          assignee_member_id: input.assigneeMemberId ?? null,
           due_date: input.dueDate,
           ambiguity_note: input.ambiguityNote,
           ai_suggestion: input.aiSuggestion,
@@ -141,6 +165,9 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
       if (patch.status !== undefined) row.status = patch.status
       if (patch.priority !== undefined) row.priority = patch.priority
       if (patch.assignee !== undefined) row.assignee = patch.assignee
+      if (patch.assigneeMemberId !== undefined) {
+        row.assignee_member_id = patch.assigneeMemberId
+      }
       if (patch.dueDate !== undefined) row.due_date = patch.dueDate
       if (patch.position !== undefined) row.position = patch.position
 

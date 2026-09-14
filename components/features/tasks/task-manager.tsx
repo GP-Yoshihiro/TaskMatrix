@@ -24,8 +24,11 @@ type ViewMode = 'list' | 'board'
 export function TaskManager({
   projectId,
   tasks,
+  members,
 }: {
   projectId: string
+  /** 名簿。担当の選択に使う */
+  members: { id: string; name: string }[]
   tasks: Task[]
 }) {
   const [view, setView] = useState<ViewMode>('list')
@@ -109,6 +112,7 @@ export function TaskManager({
       {creating && (
         <TaskForm
           projectId={projectId}
+          members={members}
           onDone={() => {
             setCreating(false)
             router.refresh()
@@ -120,6 +124,7 @@ export function TaskManager({
       {editing && (
         <TaskForm
           projectId={projectId}
+          members={members}
           task={editing}
           onDone={() => {
             setEditing(null)

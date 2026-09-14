@@ -10,6 +10,8 @@ function task(overrides: Partial<Task> & { id: string }): Task {
     projectId: 'p1',
     sourceFileId: null,
     sourceVersion: null,
+    assigneeMemberId: null,
+    assigneeMemberName: null,
     title: `タスク${overrides.id}`,
     description: '',
     status: 'todo',

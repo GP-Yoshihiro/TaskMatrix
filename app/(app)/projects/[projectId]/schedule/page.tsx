@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
 import { GoogleCalendarPanel } from '@/components/features/schedule/google-calendar-panel'
 import { SchedulePlanner } from '@/components/features/schedule/schedule-planner'
+import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/google-connections'
@@ -46,9 +47,18 @@ export default async function SchedulePage({
 
   const pendingTaskCount = tasks.filter((task) => task.status !== 'done').length
 
-  // ガントチャートの色分けに使う。予定は担当を持たないため、タスクから引く
+  // ガントチャートの色分けに使う。予定は担当を持たないため、タスクから引く。
+  // 名簿のメンバーが選ばれていればその名前、無ければ自由入力の文字
   const assigneeByTaskId = Object.fromEntries(
-    tasks.map((task) => [task.id, task.assignee ?? '']),
+    tasks.map((task) => [
+      task.id,
+      hasAssignee({ memberName: task.assigneeMemberName, freeText: task.assignee })
+        ? resolveAssignee({
+            memberName: task.assigneeMemberName,
+            freeText: task.assignee,
+          })
+        : '',
+    ]),
   )
 
   const estimate = await loadEstimate(

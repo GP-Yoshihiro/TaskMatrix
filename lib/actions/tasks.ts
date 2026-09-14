@@ -40,6 +40,8 @@ export async function createTaskAction(formData: FormData): Promise<Result<null>
         description: String(formData.get('description') ?? ''),
         priority: isTaskPriority(priorityRaw) ? priorityRaw : 'medium',
         assignee: String(formData.get('assignee') ?? ''),
+        // 空文字は「選ばない」。null で保存し、自由入力に任せる
+        assigneeMemberId: String(formData.get('assigneeMemberId') ?? '') || null,
         dueDate: normalizeDueDate(String(formData.get('dueDate') ?? '')),
         ambiguityNote: '',
         aiSuggestion: '',
@@ -76,6 +78,7 @@ export async function updateTaskAction(formData: FormData): Promise<Result<null>
       priority: isTaskPriority(priorityRaw) ? priorityRaw : 'medium',
       status: isTaskStatus(statusRaw) ? statusRaw : 'todo',
       assignee: String(formData.get('assignee') ?? ''),
+      assigneeMemberId: String(formData.get('assigneeMemberId') ?? '') || null,
       dueDate: normalizeDueDate(String(formData.get('dueDate') ?? '')),
     })
   } catch {

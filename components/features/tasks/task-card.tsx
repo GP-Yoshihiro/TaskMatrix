@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { PRIORITY_LABEL, STATUS_LABEL, TASK_STATUSES } from '@/lib/domain/tasks'
+import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
 import type { Task } from '@/lib/repositories/tasks'
 
 const PRIORITY_COLOR: Record<Task['priority'], string> = {
@@ -76,7 +77,15 @@ export function TaskCard({
           優先度: {PRIORITY_LABEL[task.priority]}
         </span>
         <span>期限: {task.dueDate ?? '未定'}</span>
-        {task.assignee && <span>担当: {task.assignee}</span>}
+        {hasAssignee({ memberName: task.assigneeMemberName, freeText: task.assignee }) && (
+          <span>
+            担当:{' '}
+            {resolveAssignee({
+              memberName: task.assigneeMemberName,
+              freeText: task.assignee,
+            })}
+          </span>
+        )}
         {showStatus && <span>状態: {STATUS_LABEL[task.status]}</span>}
       </div>
 
