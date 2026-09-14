@@ -21,8 +21,17 @@ export interface TaskExtractor {
   extract(input: { text: string } | { pdf: Uint8Array }): Promise<Result<ExtractionResult>>
 }
 
-const DEFAULT_MODEL = 'gemini-3.7-flash'
-const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash'
+/*
+ * 既定は**速い方を先**にする。
+ *
+ * 2026-09-14 の実測で、gemini-3.7-flash は「はい」と返すだけで
+ * 47.6 秒 / 115.9 秒かかり、3 回目は 429 で拒否された。
+ * gemini-3.5-flash は同じ問いに 3〜4 秒で返る。
+ *
+ * 環境変数で上書きできるが、**遅いモデルを指定すると中断しやすくなる。**
+ */
+const DEFAULT_MODEL = 'gemini-3.5-flash'
+const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash'
 
 /** 混雑・レート制限は別モデルで再試行する価値がある */
 /**
@@ -80,8 +89,10 @@ export function createGeminiTaskExtractor(): TaskExtractor {
       const deadlineAt = deadlineFrom(Date.now())
       let ranOutOfTime = false
 
-      for (const model of models) {
-        const timeoutMs = attemptTimeout(deadlineAt, Date.now())
+      for (const [index, model] of models.entries()) {
+        // 残りを、これから試す回数で分ける。
+        // 1 回目に全部与えると、遅いモデルに当たったとき予備を試せない
+        const timeoutMs = attemptTimeout(deadlineAt, Date.now(), models.length - index)
         if (timeoutMs === null) {
           // 必ず切れる呼び出しは始めない
           ranOutOfTime = true

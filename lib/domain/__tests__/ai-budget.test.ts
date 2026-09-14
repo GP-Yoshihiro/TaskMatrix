@@ -15,21 +15,28 @@ describe('deadlineFrom', () => {
 describe('attemptTimeout', () => {
   const deadline = 200_000
 
-  it('残り時間をそのまま使う', () => {
-    expect(attemptTimeout(deadline, 150_000)).toBe(50_000)
+  it('残りを、これから試す回数で分ける', () => {
+    // 1 回目に全部与えると、遅いモデルに当たったとき
+    // 予備を試す時間が残らない
+    expect(attemptTimeout(deadline, 100_000, 2)).toBe(50_000)
+  })
+
+  it('最後の 1 回には、残りをすべて与える', () => {
+    expect(attemptTimeout(deadline, 100_000, 1)).toBe(100_000)
   })
 
   it('残りが短すぎれば、始めない', () => {
     // 必ず切れる呼び出しを始めると、そのぶん打ち切りが早まる
-    expect(attemptTimeout(deadline, deadline - MIN_ATTEMPT_MS + 1)).toBeNull()
+    expect(attemptTimeout(deadline, deadline - MIN_ATTEMPT_MS + 1, 1)).toBeNull()
   })
 
-  it('ちょうど最小なら始める', () => {
-    expect(attemptTimeout(deadline, deadline - MIN_ATTEMPT_MS)).toBe(MIN_ATTEMPT_MS)
+  it('分けた結果が短すぎる場合は、最小を割り当てる', () => {
+    // 分けすぎて、どれも始められなくなるのを防ぐ
+    expect(attemptTimeout(deadline, deadline - 20_000, 4)).toBe(MIN_ATTEMPT_MS)
   })
 
   it('期限を過ぎていれば始めない', () => {
-    expect(attemptTimeout(deadline, deadline + 1)).toBeNull()
+    expect(attemptTimeout(deadline, deadline + 1, 1)).toBeNull()
   })
 })
 
