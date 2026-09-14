@@ -31,12 +31,15 @@ const labelStyle = { fontSize: '0.8rem', color: 'var(--color-fg-muted)' }
 export function TaskForm({
   projectId,
   task,
+  members,
   onDone,
   onCancel,
 }: {
   projectId: string
   /** 渡されたら編集、渡されなければ新規作成 */
   task?: Task
+  /** 名簿。担当をここから選べるようにする */
+  members: { id: string; name: string }[]
   onDone: () => void
   onCancel?: () => void
 }) {
@@ -120,8 +123,33 @@ export function TaskForm({
           )}
 
           <label style={{ display: 'grid', gap: 4 }}>
-            <span style={labelStyle}>担当</span>
+            <span style={labelStyle}>担当（名簿から選ぶ）</span>
+            <select
+              name="assigneeMemberId"
+              defaultValue={task?.assigneeMemberId ?? ''}
+              disabled={isPending || members.length === 0}
+              style={selectStyle}
+            >
+              <option value="">選ばない</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+            {members.length === 0 && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+                「メンバー」画面で登録すると、ここから選べます。
+              </span>
+            )}
+          </label>
+
+          <label style={{ display: 'grid', gap: 4 }}>
+            <span style={labelStyle}>担当（名簿に無い人）</span>
             <Input name="assignee" defaultValue={task?.assignee ?? ''} disabled={isPending} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-fg-muted)' }}>
+              名簿から選んだ場合は、そちらが使われます。
+            </span>
           </label>
 
           <label style={{ display: 'grid', gap: 4 }}>

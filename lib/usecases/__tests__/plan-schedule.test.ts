@@ -13,6 +13,8 @@ function makeTask(id: string, title: string, status: Task['status'] = 'todo'): T
     projectId: 'p1',
     sourceFileId: null,
     sourceVersion: null,
+    assigneeMemberId: null,
+    assigneeMemberName: null,
     title,
     description: '',
     status,
