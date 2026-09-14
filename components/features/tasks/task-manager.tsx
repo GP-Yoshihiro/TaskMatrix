@@ -5,8 +5,15 @@ import { useState, useTransition } from 'react'
 import { TaskCard } from '@/components/features/tasks/task-card'
 import { TaskForm } from '@/components/features/tasks/task-form'
 import { Button } from '@/components/ui/button'
+import {
+  allSelected,
+  selectionSummary,
+  toggleAll,
+  toggleOne,
+} from '@/lib/domain/selection'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { deleteTaskAction, moveTaskAction } from '@/lib/actions/tasks'
+import { deleteTaskAction, deleteTasksAction, moveTaskAction } from '@/lib/actions/tasks'
+import { callAction } from '@/lib/client/safe-action'
 import {
   STATUS_LABEL,
   TASK_STATUSES,
@@ -35,6 +42,10 @@ export function TaskManager({
   const [creating, setCreating] = useState(false)
   const [editing, setEditing] = useState<Task | null>(null)
   const [deleting, setDeleting] = useState<Task | null>(null)
+  /** まとめて操作するために選んだタスク */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -85,8 +96,44 @@ export function TaskManager({
     )
   }
 
+  /** 表示中のタスクの識別子。まとめ操作は、見えているものだけを対象にする */
+  const visibleIds = sorted.map((task) => task.id)
+
+  /** 選んだうち、いま表示されているもの。隠れているものは消さない */
+  const selectedVisible = visibleIds.filter((id) => selected.has(id))
+
+  /** 選んだタスクをまとめて消す */
+  function handleBulkDelete() {
+    setMessage(null)
+
+    const formData = new FormData()
+    formData.set('projectId', projectId)
+    // 隠れているものは含めない。見えている数と消える数を一致させる
+    formData.set('ids', JSON.stringify(selectedVisible))
+
+    startTransition(async () => {
+      const result = await callAction(() => deleteTasksAction(formData))
+      setBulkDeleting(false)
+
+      if (result.ok) {
+        setSelected(new Set())
+        // 求めた数と違えば、その旨を伝える
+        setMessage(
+          result.data === selectedVisible.length
+            ? `${result.data} 件を削除しました。`
+            : `${result.data} 件を削除しました（${selectedVisible.length} 件のうち）。`,
+        )
+        router.refresh()
+      } else {
+        setMessage(result.error.message)
+      }
+    })
+  }
+
   const cardProps = {
     pending: isPending,
+    selected: false,
+    onToggleSelect: (id: string) => setSelected((current) => toggleOne(current, id)),
     onEdit: (task: Task) => {
       setCreating(false)
       setEditing(task)
@@ -130,6 +177,47 @@ export function TaskManager({
         </span>
       </div>
 
+      {/* まとめ操作。表示中のものだけを対象にする */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          padding: '8px 10px',
+          borderRadius: 'var(--radius-sm)',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: '0.82rem' }}>
+          <input
+            type="checkbox"
+            checked={allSelected(selected, visibleIds)}
+            onChange={() => setSelected((current) => toggleAll(current, visibleIds))}
+            disabled={isPending || visibleIds.length === 0}
+            aria-label="表示中のタスクをすべて選択"
+            style={{ width: 16, height: 16, cursor: 'pointer' }}
+          />
+          すべて選択
+        </label>
+
+        <span style={{ fontSize: '0.82rem', color: 'var(--color-fg-muted)' }}>
+          {selectionSummary(selected, visibleIds)}
+        </span>
+
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => setBulkDeleting(true)}
+          disabled={isPending || selectedVisible.length === 0}
+        >
+          選択したタスクを削除
+        </Button>
+
+        {message && <span style={{ fontSize: '0.82rem' }}>{message}</span>}
+      </div>
+
       {creating && (
         <TaskForm
           projectId={projectId}
@@ -151,7 +239,12 @@ export function TaskManager({
         <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 10 }}>
           {sorted.map((task) => (
             <li key={task.id} style={{ display: 'grid', gap: 10 }}>
-              <TaskCard task={task} showStatus {...cardProps} />
+              <TaskCard
+                task={task}
+                showStatus
+                {...cardProps}
+                selected={selected.has(task.id)}
+              />
               {/* 編集枠は選んだ行の直下に出す。一覧の先頭に出すと、
                   どれを編集しているのかが分からなくなる */}
               {editing?.id === task.id && renderEditForm(task)}
@@ -189,7 +282,12 @@ export function TaskManager({
               ) : (
                 grouped[status].map((task) => (
                   <div key={task.id} style={{ display: 'grid', gap: 10 }}>
-                    <TaskCard task={task} showStatus={false} {...cardProps} />
+                    <TaskCard
+                      task={task}
+                      showStatus={false}
+                      {...cardProps}
+                      selected={selected.has(task.id)}
+                    />
                     {editing?.id === task.id && renderEditForm(task)}
                   </div>
                 ))
@@ -198,6 +296,17 @@ export function TaskManager({
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={bulkDeleting}
+        title="選択したタスクを削除しますか？"
+        description={`表示中の ${selectedVisible.length} 件を削除します。`}
+        warning="一度削除すると復元はできません。"
+        confirmLabel="まとめて削除する"
+        pending={isPending}
+        onConfirm={handleBulkDelete}
+        onCancel={() => setBulkDeleting(false)}
+      />
 
       <ConfirmDialog
         open={deleting !== null}

@@ -24,6 +24,8 @@ export function TaskCard({
   onEdit,
   onDelete,
   onMove,
+  selected,
+  onToggleSelect,
 }: {
   task: Task
   /** カンバンでは列がステータスを表すので出さない */
@@ -32,21 +34,37 @@ export function TaskCard({
   onEdit: (task: Task) => void
   onDelete: (task: Task) => void
   onMove: (task: Task, status: Task['status']) => void
+  selected: boolean
+  onToggleSelect: (id: string) => void
 }) {
   const hasNotes = task.ambiguityNote !== '' || task.aiSuggestion !== ''
 
   return (
     <article
       style={{
-        border: '1px solid var(--color-border)',
+        // 選んだものは枠で示す。印だけだと、どれを選んだか見落とす
+        border: selected
+          ? '1px solid var(--color-accent)'
+          : '1px solid var(--color-border)',
         borderRadius: 'var(--radius-md)',
-        background: 'var(--color-bg)',
+        background: selected
+          ? 'color-mix(in srgb, var(--color-accent) 6%, var(--color-bg))'
+          : 'var(--color-bg)',
         padding: 12,
         display: 'grid',
         gap: 8,
       }}
     >
       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        {/* まとめて操作するための選択。行の先頭に置き、見つけやすくする */}
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(task.id)}
+          disabled={pending}
+          aria-label={`タスク「${task.title}」を選択`}
+          style={{ width: 16, height: 16, cursor: 'pointer', alignSelf: 'center' }}
+        />
         <span style={{ fontWeight: 600 }}>{task.title}</span>
         {task.origin === 'ai' && (
           <span

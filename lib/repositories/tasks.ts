@@ -66,6 +66,8 @@ export interface TaskRepository {
   createMany(inputs: TaskInput[]): Promise<number>
   update(id: string, patch: TaskPatch): Promise<void>
   remove(id: string): Promise<void>
+  /** まとめて消す。1 件ずつ往復すると、件数だけ待たされる */
+  removeMany(ids: string[]): Promise<number>
 }
 
 type Row = {
@@ -196,6 +198,21 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
     async remove(id) {
       const { error } = await supabase.from('tasks').delete().eq('id', id)
       if (error) throw error
+    },
+
+    async removeMany(ids) {
+      if (ids.length === 0) return 0
+
+      // 消せた件数を返す。行レベルセキュリティにより、
+      // 他人のタスクを混ぜても消えない（件数の差で気付ける）
+      const { data, error } = await supabase
+        .from('tasks')
+        .delete()
+        .in('id', ids)
+        .select('id')
+      if (error) throw error
+
+      return (data ?? []).length
     },
   }
 }
