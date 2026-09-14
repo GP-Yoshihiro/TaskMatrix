@@ -27,6 +27,7 @@ export const PROJECT_NAV: NavItem[] = [
   { label: 'タスク', href: '/projects/:projectId/tasks', icon: '✅' },
   { label: '予定', href: '/projects/:projectId/schedule', icon: '🗓️' },
   { label: 'AI チャット', href: '/projects/:projectId/chat', icon: '💬' },
+  { label: 'メンバー', href: '/projects/:projectId/members', icon: '👥' },
   { label: '変更履歴', href: '/projects/:projectId/history', icon: '🕘' },
 ]
 
