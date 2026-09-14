@@ -33,9 +33,22 @@ export function deadlineFrom(startedAt: number): number {
 
 /**
  * 次の呼び出しに与える時間。始めるべきでなければ null。
+ *
+ * **残りを、これから試す回数で分ける。**
+ * 1 回目に全部与えると、遅いモデルに当たったときに持ち時間を使い切り、
+ * **予備を試す時間が残らない。**（実際にこれが起きていた）
+ *
+ * 分けた結果が最小を下回る場合は、最小を割り当てる。
+ * 分けすぎて、どれも始められなくなるのを防ぐ。
  */
-export function attemptTimeout(deadlineAt: number, now: number): number | null {
+export function attemptTimeout(
+  deadlineAt: number,
+  now: number,
+  attemptsLeft: number,
+): number | null {
   const remaining = deadlineAt - now
   if (remaining < MIN_ATTEMPT_MS) return null
-  return remaining
+
+  const share = Math.floor(remaining / Math.max(1, attemptsLeft))
+  return Math.max(MIN_ATTEMPT_MS, Math.min(share, remaining))
 }

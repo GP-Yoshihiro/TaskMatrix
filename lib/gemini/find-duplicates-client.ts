@@ -13,7 +13,7 @@ import { readUsage } from '@/lib/gemini/usage'
 const REQUEST_TIMEOUT_MS = 45_000
 
 const DEFAULT_MODEL = 'gemini-3.5-flash'
-const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash-lite'
+const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash'
 
 export interface DuplicateFinder {
   find(
