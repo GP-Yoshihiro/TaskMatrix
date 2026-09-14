@@ -41,7 +41,7 @@ afterEach(() => {
 function setup() {
   return {
     user: userEvent.setup(),
-    ...render(<CalendarView entries={ENTRIES} settings={SETTINGS} />),
+    ...render(<CalendarView entries={ENTRIES} settings={SETTINGS} sections={{}} />),
   }
 }
 

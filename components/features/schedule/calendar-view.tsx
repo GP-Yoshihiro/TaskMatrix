@@ -14,6 +14,7 @@ import {
   rangeLabel,
   shiftAnchor,
 } from '@/lib/domain/calendar-range'
+import type { SectionsByAssignee } from '@/lib/domain/gantt-group'
 import type { WorkSettings } from '@/lib/domain/schedule'
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
@@ -59,9 +60,12 @@ function heatBackground(level: number): string {
 export function CalendarView({
   entries,
   settings,
+  sections,
 }: {
   entries: CalendarEntry[]
   settings: WorkSettings
+  /** 担当名から所属セクションを引く表。ガントチャートの区切りに使う */
+  sections: SectionsByAssignee
 }) {
   const [range, setRange] = useState<CalendarRange>('month')
   const [anchor, setAnchor] = useState(() => todayKey(settings.timezone))
@@ -133,7 +137,12 @@ export function CalendarView({
 
       {/* 棒グラフ。年は範囲が広すぎて 1 本が点になるため出さない */}
       {range !== 'year' && (
-        <ScheduleGantt entries={entries} bounds={bounds} timezone={settings.timezone} />
+        <ScheduleGantt
+          entries={entries}
+          bounds={bounds}
+          timezone={settings.timezone}
+          sections={sections}
+        />
       )}
 
       {range === 'month' && (
