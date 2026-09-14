@@ -1,4 +1,11 @@
 import { NextResponse } from 'next/server'
+import {
+  EXPECTED_SCHEMA,
+  type TableCheck,
+  missingColumnsFrom,
+  summarizeSchemaChecks,
+} from '@/lib/domain/schema-check'
+import { createServiceSupabaseClient } from '@/lib/supabase/service'
 
 /**
  * 設定が届いているかを確かめるための経路。
@@ -9,6 +16,10 @@ import { NextResponse } from 'next/server'
  *
  * proxy を通さない設定にしている。proxy 自体が落ちているときでも
  * 応答できなければ、切り分けの役に立たないため。
+ *
+ * 表の構造も確かめる。移行 SQL の適用漏れは 2 度起きており、
+ * 外から確かめる手段が無いと、毎回やり取りを重ねて切り分けることになる。
+ * ここでも**返すのは列の名前と有無だけ**で、データの中身は含めない。
  */
 
 const REQUIRED = [
@@ -42,6 +53,38 @@ function inspect(value: string | undefined) {
   }
 }
 
+/**
+ * 表と列がそろっているかを確かめる。
+ *
+ * `limit(0)` で問い合わせる。**行は 1 件も返らない**ため、
+ * データの中身がこの経路から出ることはない。
+ * 列が無ければ問い合わせ自体が失敗し、その理由から不足を拾う。
+ */
+async function checkSchema(): Promise<{ ok: boolean; missing: string[] } | null> {
+  const service = createServiceSupabaseClient()
+  // 鍵が無ければ調べられない。「問題なし」とは言わず、未確認として返す
+  if (!service) return null
+
+  const checks: TableCheck[] = await Promise.all(
+    EXPECTED_SCHEMA.map(async (expected) => {
+      const { error } = await service
+        .from(expected.table)
+        .select(expected.columns.join(', '))
+        .limit(0)
+
+      if (!error) return { table: expected.table, ok: true, missing: [] }
+
+      return {
+        table: expected.table,
+        ok: false,
+        missing: missingColumnsFrom(error.message ?? '', expected.columns),
+      }
+    }),
+  )
+
+  return summarizeSchemaChecks(checks)
+}
+
 export async function GET() {
   const configured: Record<string, ReturnType<typeof inspect>> = {}
   for (const name of REQUIRED) {
@@ -68,8 +111,26 @@ export async function GET() {
     configured.NEXT_PUBLIC_SUPABASE_ANON_KEY.present &&
     supabaseUrlParses
 
+  // 構造の確認そのものが失敗しても、設定の確認は返す。
+  // 切り分けの手段を、別の不具合で失いたくない
+  let schema: { ok: boolean; missing: string[] } | null = null
+  try {
+    schema = await checkSchema()
+  } catch {
+    schema = null
+  }
+
+  const ok = canAuthenticate && schema?.ok !== false
+
   return NextResponse.json(
-    { ok: canAuthenticate, supabaseUrlParses, supabaseUrlProtocol, configured },
-    { status: canAuthenticate ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
+    {
+      ok,
+      supabaseUrlParses,
+      supabaseUrlProtocol,
+      configured,
+      // null は「調べられなかった」。問題なしとは区別する
+      schema: schema ?? { ok: null, missing: [], note: '構造を確認できませんでした' },
+    },
+    { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
   )
 }
