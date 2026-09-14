@@ -3,6 +3,7 @@ import {
   preprocessText,
   validateExtractedText,
 } from '@/lib/domain/extraction'
+import { type EstimateSource, normalizeEstimatedDays } from '@/lib/domain/estimate-days'
 import { getExtension } from '@/lib/domain/files'
 import { type AppError, type Result, err, ok } from '@/lib/domain/result'
 import type { AiUsage } from '@/lib/domain/usage'
@@ -21,6 +22,10 @@ export type TaskSuggestion = {
   dueDate: string | null
   ambiguityNote: string
   aiSuggestion: string
+  /** 想定日程（日）。未設定は null */
+  estimatedDays: number | null
+  /** 想定日程の出どころ */
+  estimateSource: EstimateSource | ''
 }
 
 type Deps = {
@@ -99,6 +104,11 @@ export async function extractTasksFromFile(
     dueDate: normalizeDueDate(task.due_date),
     ambiguityNote: task.ambiguity_note,
     aiSuggestion: task.ai_suggestion,
+    // 0 や範囲外は未設定に落とす。丸めはドメインに任せる
+    estimatedDays: normalizeEstimatedDays(task.estimated_days),
+    estimateSource: normalizeEstimatedDays(task.estimated_days) === null
+      ? ''
+      : task.estimate_source || 'inferred',
   }))
 
   await deps.runs.finish({

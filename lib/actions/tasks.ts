@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { parseEstimatedDays } from '@/lib/domain/estimate-days'
 import { type Result, err, ok } from '@/lib/domain/result'
 import {
   isTaskPriority,
@@ -42,6 +43,9 @@ export async function createTaskAction(formData: FormData): Promise<Result<null>
         assignee: String(formData.get('assignee') ?? ''),
         // 空文字は「選ばない」。null で保存し、自由入力に任せる
         assigneeMemberId: String(formData.get('assigneeMemberId') ?? '') || null,
+        estimatedDays: parseEstimatedDays(String(formData.get('estimatedDays') ?? '')),
+        // 手で入れた値は、資料の記載でも AI の推定でもない
+        estimateSource: '',
         dueDate: normalizeDueDate(String(formData.get('dueDate') ?? '')),
         ambiguityNote: '',
         aiSuggestion: '',
@@ -79,6 +83,9 @@ export async function updateTaskAction(formData: FormData): Promise<Result<null>
       status: isTaskStatus(statusRaw) ? statusRaw : 'todo',
       assignee: String(formData.get('assignee') ?? ''),
       assigneeMemberId: String(formData.get('assigneeMemberId') ?? '') || null,
+      estimatedDays: parseEstimatedDays(String(formData.get('estimatedDays') ?? '')),
+      // 手で入れた値は、資料の記載でも AI の推定でもない
+      estimateSource: '',
       dueDate: normalizeDueDate(String(formData.get('dueDate') ?? '')),
     })
   } catch {

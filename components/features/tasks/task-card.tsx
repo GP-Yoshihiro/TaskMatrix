@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { PRIORITY_LABEL, STATUS_LABEL, TASK_STATUSES } from '@/lib/domain/tasks'
 import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
+import { ESTIMATE_SOURCE_LABEL, formatEstimatedDays } from '@/lib/domain/estimate-days'
 import type { Task } from '@/lib/repositories/tasks'
 
 const PRIORITY_COLOR: Record<Task['priority'], string> = {
@@ -77,6 +78,15 @@ export function TaskCard({
           優先度: {PRIORITY_LABEL[task.priority]}
         </span>
         <span>期限: {task.dueDate ?? '未定'}</span>
+        {task.estimatedDays !== null && (
+          <span title={ESTIMATE_SOURCE_LABEL[task.estimateSource]}>
+            想定: {formatEstimatedDays(task.estimatedDays)}
+            {/* 推定値を、書かれていた値と同じ顔で出さない */}
+            {task.estimateSource === 'inferred' && (
+              <span style={{ color: 'var(--color-fg-muted)' }}>（推定）</span>
+            )}
+          </span>
+        )}
         {hasAssignee({ memberName: task.assigneeMemberName, freeText: task.assignee }) && (
           <span>
             担当:{' '}

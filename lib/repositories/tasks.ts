@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { EstimateSource } from '@/lib/domain/estimate-days'
 import type { TaskPriority, TaskStatus } from '@/lib/domain/tasks'
 
 export type Task = {
@@ -15,6 +16,10 @@ export type Task = {
   assigneeMemberId: string | null
   /** 表示用のメンバー名。参照が切れていれば null */
   assigneeMemberName: string | null
+  /** 想定日程（日）。0.5 刻み。未設定は null */
+  estimatedDays: number | null
+  /** 想定日程の出どころ。空は手入力または未設定 */
+  estimateSource: EstimateSource | ''
   dueDate: string | null
   ambiguityNote: string
   aiSuggestion: string
@@ -26,6 +31,8 @@ export type Task = {
 export type TaskInput = {
   /** 名簿からの担当。AI 抽出では決まらないため null */
   assigneeMemberId?: string | null
+  estimatedDays?: number | null
+  estimateSource?: EstimateSource | ''
   projectId: string
   sourceFileId: string | null
   sourceVersion: number | null
@@ -43,6 +50,8 @@ export type TaskInput = {
 export type TaskPatch = Partial<{
   /** null を渡すと、名簿からの担当を外す */
   assigneeMemberId: string | null
+  estimatedDays: number | null
+  estimateSource: EstimateSource | ''
   title: string
   description: string
   status: TaskStatus
@@ -70,6 +79,8 @@ type Row = {
   priority: TaskPriority
   assignee: string
   assignee_member_id: string | null
+  estimated_days: number | string | null
+  estimate_source: EstimateSource | ''
   /** 結合結果。PostgREST は配列で返す */
   project_members: { name: string }[] | { name: string } | null
   due_date: string | null
@@ -81,7 +92,7 @@ type Row = {
 }
 
 const COLUMNS =
-  'id, project_id, source_file_id, source_version, title, description, status, priority, assignee, assignee_member_id, project_members(name), due_date, ambiguity_note, ai_suggestion, origin, position, updated_at'
+  'id, project_id, source_file_id, source_version, title, description, status, priority, assignee, assignee_member_id, estimated_days, estimate_source, project_members(name), due_date, ambiguity_note, ai_suggestion, origin, position, updated_at'
 
 /** 結合結果から名前を取り出す。配列でも単体でも受ける */
 function memberNameOf(
@@ -105,6 +116,9 @@ function toTask(row: Row): Task {
     assignee: row.assignee,
     assigneeMemberId: row.assignee_member_id,
     assigneeMemberName: memberNameOf(row.project_members),
+    // numeric は文字列で返ることがある
+    estimatedDays: row.estimated_days === null ? null : Number(row.estimated_days),
+    estimateSource: row.estimate_source,
     dueDate: row.due_date,
     ambiguityNote: row.ambiguity_note,
     aiSuggestion: row.ai_suggestion,
@@ -145,6 +159,8 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
           priority: input.priority,
           assignee: input.assignee,
           assignee_member_id: input.assigneeMemberId ?? null,
+          estimated_days: input.estimatedDays ?? null,
+          estimate_source: input.estimateSource ?? '',
           due_date: input.dueDate,
           ambiguity_note: input.ambiguityNote,
           ai_suggestion: input.aiSuggestion,
@@ -168,6 +184,8 @@ export function createSupabaseTaskRepository(supabase: SupabaseClient): TaskRepo
       if (patch.assigneeMemberId !== undefined) {
         row.assignee_member_id = patch.assigneeMemberId
       }
+      if (patch.estimatedDays !== undefined) row.estimated_days = patch.estimatedDays
+      if (patch.estimateSource !== undefined) row.estimate_source = patch.estimateSource
       if (patch.dueDate !== undefined) row.due_date = patch.dueDate
       if (patch.position !== undefined) row.position = patch.position
 

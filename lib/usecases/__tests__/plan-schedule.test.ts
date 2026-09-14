@@ -15,6 +15,8 @@ function makeTask(id: string, title: string, status: Task['status'] = 'todo'): T
     sourceVersion: null,
     assigneeMemberId: null,
     assigneeMemberName: null,
+    estimatedDays: null,
+    estimateSource: '' as const,
     title,
     description: '',
     status,

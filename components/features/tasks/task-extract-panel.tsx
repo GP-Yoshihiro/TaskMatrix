@@ -7,6 +7,7 @@ import { AiProgress } from '@/components/ui/ai-progress'
 import { AiUsageNote } from '@/components/ui/ai-usage-note'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { formatEstimatedDays } from '@/lib/domain/estimate-days'
 import { extractTasksAction, registerTasksAction } from '@/lib/actions/extraction'
 import { callAction } from '@/lib/client/safe-action'
 import { PRIORITY_LABEL } from '@/lib/domain/tasks'
@@ -167,6 +168,10 @@ export function TaskExtractPanel({
                     優先度: {PRIORITY_LABEL[suggestion.priority]}
                     {suggestion.dueDate ? ` / 期限: ${suggestion.dueDate}` : ' / 期限: 未定'}
                     {suggestion.assignee ? ` / 担当: ${suggestion.assignee}` : ''}
+                    {suggestion.estimatedDays !== null &&
+                      ` / 想定: ${formatEstimatedDays(suggestion.estimatedDays)}${
+                        suggestion.estimateSource === 'inferred' ? '（推定）' : ''
+                      }`}
                   </span>
                 </label>
                 {suggestion.description && (

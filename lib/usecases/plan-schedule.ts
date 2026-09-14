@@ -74,6 +74,7 @@ export async function planScheduleForProject(
       description: task.description,
       priority: task.priority,
       dueDate: task.dueDate,
+      estimatedDays: task.estimatedDays,
     })),
     confirmed: confirmed.map((schedule) => ({
       taskTitle: schedule.taskTitle,
