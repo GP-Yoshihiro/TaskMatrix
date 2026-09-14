@@ -46,6 +46,11 @@ export default async function SchedulePage({
 
   const pendingTaskCount = tasks.filter((task) => task.status !== 'done').length
 
+  // ガントチャートの色分けに使う。予定は担当を持たないため、タスクから引く
+  const assigneeByTaskId = Object.fromEntries(
+    tasks.map((task) => [task.id, task.assignee ?? '']),
+  )
+
   const estimate = await loadEstimate(
     createSupabaseAiUsageRepository(supabase),
     'plan_schedule',
@@ -66,6 +71,7 @@ export default async function SchedulePage({
         description="未完了のタスクから予定を算出し、確定するとカレンダーに反映されます。"
       />
       <SchedulePlanner
+        assigneeByTaskId={assigneeByTaskId}
         projectId={projectId}
         confirmed={confirmed}
         pendingTaskCount={pendingTaskCount}

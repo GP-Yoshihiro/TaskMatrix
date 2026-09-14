@@ -26,6 +26,8 @@ type Comparable = {
   startsAt: string
   endsAt: string
   label: string
+  /** 担当。ガントチャートの色分けに使う */
+  assignee: string
   kind: 'draft' | 'confirmed'
 }
 
@@ -40,12 +42,15 @@ export function SchedulePlanner({
   pendingTaskCount,
   settings,
   estimate,
+  assigneeByTaskId,
 }: {
   projectId: string
   confirmed: Schedule[]
   pendingTaskCount: number
   settings: WorkSettings
   estimate: Estimate
+  /** タスク ID から担当を引く。ガントチャートの色分けに使う */
+  assigneeByTaskId: Record<string, string>
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -70,6 +75,7 @@ export function SchedulePlanner({
       startsAt: draft.startsAt,
       endsAt: draft.endsAt,
       label: draft.taskTitle,
+      assignee: assigneeByTaskId[draft.taskId] ?? '',
       kind: 'draft' as const,
     }))
     const fromConfirmed = confirmed.map((schedule) => ({
@@ -77,10 +83,11 @@ export function SchedulePlanner({
       startsAt: schedule.startsAt,
       endsAt: schedule.endsAt,
       label: schedule.taskTitle,
+      assignee: assigneeByTaskId[schedule.taskId] ?? '',
       kind: 'confirmed' as const,
     }))
     return [...fromDrafts, ...fromConfirmed]
-  }, [drafts, confirmed])
+  }, [drafts, confirmed, assigneeByTaskId])
 
   function conflictsFor(draft: ScheduleDraft): Conflict[] {
     return findOverlaps(
@@ -89,6 +96,7 @@ export function SchedulePlanner({
         startsAt: draft.startsAt,
         endsAt: draft.endsAt,
         label: draft.taskTitle,
+        assignee: assigneeByTaskId[draft.taskId] ?? '',
         kind: 'draft' as const,
       },
       comparables,
@@ -115,6 +123,7 @@ export function SchedulePlanner({
   const calendarEntries: CalendarEntry[] = comparables.map((item) => ({
     id: item.id,
     label: item.label,
+    assignee: item.assignee,
     startsAt: item.startsAt,
     endsAt: item.endsAt,
     draft: item.kind === 'draft',

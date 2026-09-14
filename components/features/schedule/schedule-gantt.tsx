@@ -3,183 +3,184 @@
 import { useMemo } from 'react'
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import type { Bounds } from '@/lib/domain/gantt'
-import { buildGanttDayRows, ganttHourTicks } from '@/lib/domain/gantt'
+import { assigneeColors, buildGanttTaskRows, ganttTicks } from '@/lib/domain/gantt'
 
-/** 段 1 つぶんの高さ。詰めすぎると棒の文字が読めない */
-const LANE_HEIGHT = 22
+/** 行 1 つぶんの高さ。詰めすぎると押しにくい */
+const ROW_HEIGHT = 26
 
-/** 左の日付欄の幅。曜日まで入る幅を確保する */
-const DATE_COLUMN = 78
+/** 左の工程名欄の幅 */
+const LABEL_COLUMN = 150
 
 const muted = { color: 'var(--color-fg-muted)' } as const
 
 /**
- * 予定を時間軸の横棒で示す。
+ * 予定をガントチャートで示す。
  *
- * **日付は縦（左側）、時刻は横。** 1 行がその日の 0 時〜24 時にあたる。
- * 横軸に日付を並べると 1 件あたりの棒が細くなり、
- * 「その日の何時から何時か」が読み取れない。
+ * **左の縦軸＝作業工程、上の横軸＝日付。** 棒は横に伸びる。
+ * 担当ごとに色を分け、誰の受け持ちかを行を読まずに見分けられるようにする。
  */
 export function ScheduleGantt({
   entries,
   bounds,
   timezone,
-  today,
 }: {
   entries: CalendarEntry[]
   bounds: Bounds
   timezone: string
-  /** 今日の日付（YYYY-MM-DD）。行を目立たせるために使う */
-  today: string
 }) {
   const rows = useMemo(
-    () => buildGanttDayRows(entries, bounds, timezone),
+    () => buildGanttTaskRows(entries, bounds, timezone),
     [entries, bounds, timezone],
   )
-  const ticks = useMemo(() => ganttHourTicks(), [])
+  const ticks = useMemo(() => ganttTicks(bounds), [bounds])
+  const colors = useMemo(() => assigneeColors(rows.map((row) => row.assignee)), [rows])
 
-  const total = rows.reduce((sum, row) => sum + row.bars.length, 0)
+  if (rows.length === 0) {
+    return <p style={{ ...muted, fontSize: '0.85rem' }}>この期間に予定はありません。</p>
+  }
 
   return (
-    <div style={{ display: 'grid', gap: 4 }}>
-      {/* 時刻の目盛り。日付欄のぶんだけ右にずらして、行の中と位置を合わせる */}
-      <div style={{ display: 'flex' }}>
-        <span style={{ width: DATE_COLUMN, flexShrink: 0 }} />
-        <div style={{ position: 'relative', flex: 1, height: 14, fontSize: '0.68rem', ...muted }}>
-          {ticks.map((tick) => (
+    <div style={{ display: 'grid', gap: 8 }}>
+      {/* 担当の凡例。色だけでは誰の色か分からない */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: '0.75rem' }}>
+        {[...colors.entries()].map(([name, color]) => (
+          <span key={name} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span
-              key={tick.label}
-              style={{
-                position: 'absolute',
-                left: `${tick.percent}%`,
-                transform: 'translateX(-50%)',
-                whiteSpace: 'nowrap',
-              }}
+              aria-hidden
+              style={{ width: 10, height: 10, borderRadius: 2, background: color }}
+            />
+            {name}
+          </span>
+        ))}
+      </div>
+
+      {/* 横に収まらないときは、この枠の中だけを動かす */}
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ minWidth: 520 }}>
+          {/* 上部の日付。工程名欄のぶんだけ右にずらして、棒と位置を合わせる */}
+          <div style={{ display: 'flex' }}>
+            <span style={{ width: LABEL_COLUMN, flexShrink: 0 }} />
+            <div
+              style={{ position: 'relative', flex: 1, height: 16, fontSize: '0.68rem', ...muted }}
             >
-              {tick.label}
-            </span>
-          ))}
+              {ticks.map((tick) => (
+                <span
+                  key={tick.label}
+                  style={{
+                    position: 'absolute',
+                    left: `${tick.percent}%`,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {tick.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              overflow: 'hidden',
+            }}
+          >
+            {rows.map((row, index) => (
+              <div
+                key={row.key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'stretch',
+                  borderTop: index === 0 ? 'none' : '1px solid var(--color-border)',
+                }}
+              >
+                {/* 左の工程名。ここが縦の軸になる */}
+                <span
+                  title={`${row.label}（${row.assignee}）`}
+                  style={{
+                    width: LABEL_COLUMN,
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '0 8px',
+                    height: ROW_HEIGHT,
+                    fontSize: '0.75rem',
+                    borderRight: '1px solid var(--color-border)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 2,
+                      flexShrink: 0,
+                      background: colors.get(row.assignee),
+                    }}
+                  />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {row.label}
+                  </span>
+                </span>
+
+                <div style={{ position: 'relative', flex: 1, height: ROW_HEIGHT }}>
+                  {/* 縦の補助線。棒がどの日付にあたるかを目で追えるようにする */}
+                  {ticks.map((tick) => (
+                    <span
+                      key={`line-${row.key}-${tick.label}`}
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: `${tick.percent}%`,
+                        width: 1,
+                        background: 'var(--color-border)',
+                        opacity: 0.5,
+                      }}
+                    />
+                  ))}
+
+                  {row.bars.map((bar) => (
+                    <div
+                      key={bar.id}
+                      title={`${row.label}／${row.assignee}（${bar.timeLabel}）`}
+                      style={{
+                        position: 'absolute',
+                        left: `${bar.leftPercent}%`,
+                        width: `${bar.widthPercent}%`,
+                        top: 5,
+                        height: ROW_HEIGHT - 10,
+                        borderRadius: 3,
+                        // 仮案は塗らず破線で囲む。確定済みと見分けが付くように
+                        background: bar.draft ? 'transparent' : colors.get(row.assignee),
+                        border: bar.draft
+                          ? `1px dashed ${colors.get(row.assignee)}`
+                          : '1px solid transparent',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div
-        style={{
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          overflow: 'hidden',
-        }}
-      >
-        {rows.map((row) => {
-          const isToday = row.date === today
-
-          return (
-            <div
-              key={row.date}
-              style={{
-                display: 'flex',
-                alignItems: 'stretch',
-                borderTop: '1px solid var(--color-border)',
-                background: isToday
-                  ? 'color-mix(in srgb, var(--color-accent) 7%, transparent)'
-                  : 'transparent',
-              }}
-            >
-              {/* 左の日付。ここが縦の軸になる */}
-              <span
-                style={{
-                  width: DATE_COLUMN,
-                  flexShrink: 0,
-                  padding: '4px 8px',
-                  fontSize: '0.72rem',
-                  fontWeight: isToday ? 700 : 400,
-                  color: isToday ? 'var(--color-accent)' : 'var(--color-fg-muted)',
-                  borderRight: '1px solid var(--color-border)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {row.label}
-              </span>
-
-              <div
-                style={{
-                  position: 'relative',
-                  flex: 1,
-                  height: row.lanes * LANE_HEIGHT + 6,
-                  padding: '3px 0',
-                }}
-              >
-                {/* 縦の補助線。棒がどの時刻にあたるかを目で追えるようにする */}
-                {ticks.map((tick) => (
-                  <span
-                    key={`line-${row.date}-${tick.label}`}
-                    aria-hidden
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      bottom: 0,
-                      left: `${tick.percent}%`,
-                      width: 1,
-                      background: 'var(--color-border)',
-                      opacity: 0.5,
-                    }}
-                  />
-                ))}
-
-                {row.bars.map((bar) => (
-                  <div
-                    key={`${row.date}-${bar.id}`}
-                    title={`${bar.label}（${bar.timeLabel}）`}
-                    style={{
-                      position: 'absolute',
-                      left: `${bar.leftPercent}%`,
-                      width: `${bar.widthPercent}%`,
-                      top: 3 + bar.lane * LANE_HEIGHT,
-                      height: LANE_HEIGHT - 4,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '0 6px',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '0.7rem',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      // 仮案は塗らず破線で囲む。確定済みと見分けが付くように
-                      background: bar.draft
-                        ? 'color-mix(in srgb, var(--color-accent) 14%, transparent)'
-                        : 'var(--color-accent)',
-                      color: bar.draft ? 'var(--color-fg)' : 'var(--color-accent-fg)',
-                      border: bar.draft
-                        ? '1px dashed var(--color-accent)'
-                        : '1px solid transparent',
-                    }}
-                  >
-                    {bar.draft && <span style={{ fontWeight: 700 }}>仮</span>}
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {bar.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {total === 0 ? (
-        <p style={{ ...muted, fontSize: '0.8rem' }}>この期間に予定はありません。</p>
-      ) : (
-        /* 棒が短いと中の文字が読めない。表でも同じ内容を出す */
-        <ul style={{ margin: 0, paddingLeft: '1.2em', fontSize: '0.75rem', ...muted }}>
-          {rows.flatMap((row) =>
-            row.bars.map((bar) => (
-              <li key={`legend-${row.date}-${bar.id}`}>
-                {row.label} {bar.timeLabel} — {bar.label}
-                {bar.draft && '（仮）'}
-              </li>
-            )),
-          )}
-        </ul>
-      )}
+      {/* 棒には文字が入らない。正確な期間は文字でも出す */}
+      <ul style={{ margin: 0, paddingLeft: '1.2em', fontSize: '0.75rem', ...muted }}>
+        {rows.flatMap((row) =>
+          row.bars.map((bar) => (
+            <li key={`legend-${bar.id}`}>
+              {row.label}／{row.assignee} — {bar.timeLabel}
+              {bar.draft && '（仮）'}
+            </li>
+          )),
+        )}
+      </ul>
     </div>
   )
 }

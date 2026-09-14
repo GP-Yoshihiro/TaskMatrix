@@ -11,6 +11,7 @@ const ENTRIES: CalendarEntry[] = [
   {
     id: 'a',
     label: '資料作成',
+    assignee: '田中',
     startsAt: '2026-09-14T01:00:00.000Z', // 日本時間 10:00
     endsAt: '2026-09-14T03:00:00.000Z',
     draft: false,
@@ -18,6 +19,7 @@ const ENTRIES: CalendarEntry[] = [
   {
     id: 'b',
     label: '打ち合わせ',
+    assignee: '鈴木',
     startsAt: '2026-09-16T05:00:00.000Z',
     endsAt: '2026-09-16T06:00:00.000Z',
     draft: true,

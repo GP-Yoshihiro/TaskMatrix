@@ -133,12 +133,7 @@ export function CalendarView({
 
       {/* 棒グラフ。年は範囲が広すぎて 1 本が点になるため出さない */}
       {range !== 'year' && (
-        <ScheduleGantt
-          entries={entries}
-          bounds={bounds}
-          timezone={settings.timezone}
-          today={today}
-        />
+        <ScheduleGantt entries={entries} bounds={bounds} timezone={settings.timezone} />
       )}
 
       {range === 'month' && (
