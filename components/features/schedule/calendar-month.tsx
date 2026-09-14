@@ -1,8 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { buildMonthGrid, formatMonthLabel, shiftMonth } from '@/lib/domain/calendar'
+import { useMemo } from 'react'
+import { buildMonthGrid, formatMonthLabel } from '@/lib/domain/calendar'
 import { type WorkSettings, overlaps } from '@/lib/domain/schedule'
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
@@ -48,9 +47,17 @@ function timeIn(iso: string, timezone: string): string {
 export function CalendarMonth({
   entries,
   settings,
+  anchor,
 }: {
   entries: CalendarEntry[]
   settings: WorkSettings
+  /**
+   * 表示する月（YYYY-MM-DD）。
+   *
+   * 月の移動は CalendarView が持つ。年・週・日と操作を揃えるため、
+   * ここでは受け取った月を描くことに徹する。
+   */
+  anchor: string
 }) {
   const today = useMemo(() => {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -63,7 +70,10 @@ export function CalendarMonth({
     return { year, month, date: parts }
   }, [settings.timezone])
 
-  const [view, setView] = useState({ year: today.year, month: today.month })
+  const view = useMemo(() => {
+    const [year, month] = anchor.split('-').map(Number)
+    return { year, month }
+  }, [anchor])
 
   const grid = useMemo(() => buildMonthGrid(view.year, view.month), [view])
 
@@ -88,35 +98,6 @@ export function CalendarMonth({
 
   return (
     <section style={{ display: 'grid', gap: 10 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label="前の月へ"
-          onClick={() => setView((v) => shiftMonth(v.year, v.month, -1))}
-        >
-          ← 前の月
-        </Button>
-        <strong style={{ fontSize: '1rem', minWidth: '7em', textAlign: 'center' }}>
-          {formatMonthLabel(view.year, view.month)}
-        </strong>
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label="次の月へ"
-          onClick={() => setView((v) => shiftMonth(v.year, v.month, 1))}
-        >
-          次の月 →
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setView({ year: today.year, month: today.month })}
-        >
-          今月へ
-        </Button>
-      </div>
-
       <div
         role="grid"
         aria-label={`${formatMonthLabel(view.year, view.month)} のカレンダー`}
