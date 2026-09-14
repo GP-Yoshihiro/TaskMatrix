@@ -34,9 +34,15 @@ export function deadlineFrom(startedAt: number): number {
 /**
  * 次の呼び出しに与える時間。始めるべきでなければ null。
  *
- * **残りを、これから試す回数で分ける。**
- * 1 回目に全部与えると、遅いモデルに当たったときに持ち時間を使い切り、
- * **予備を試す時間が残らない。**（実際にこれが起きていた）
+ * **後の回ほど多く与える。**
+ *
+ * 前の回が時間切れになったということは、そのモデルが遅いということ。
+ * 残りを等分すると、**最後の回にも十分な時間が残らない。**
+ * 実測では 71 件の算出に 42 秒かかり、等分（50 秒）では
+ * ばらつきで超えて失敗していた。
+ *
+ * 残り回数が n のとき、この回に与えるのは「残り ÷ (n+1)」。
+ * 2 回なら 1 回目に約 1/3、最後に約 2/3 が渡る。
  *
  * 分けた結果が最小を下回る場合は、最小を割り当てる。
  * 分けすぎて、どれも始められなくなるのを防ぐ。
@@ -49,6 +55,9 @@ export function attemptTimeout(
   const remaining = deadlineAt - now
   if (remaining < MIN_ATTEMPT_MS) return null
 
-  const share = Math.floor(remaining / Math.max(1, attemptsLeft))
+  // 最後の 1 回には、残りをすべて与える
+  if (attemptsLeft <= 1) return remaining
+
+  const share = Math.floor(remaining / (attemptsLeft + 1))
   return Math.max(MIN_ATTEMPT_MS, Math.min(share, remaining))
 }
