@@ -19,32 +19,30 @@ export default async function ChatPage({
   const { projectId } = await params
   const supabase = await createServerSupabaseClient()
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id, name')
-    .eq('id', projectId)
-    .maybeSingle()
+  const chunks = createSupabaseFileChunkRepository(supabase)
+  const chat = createSupabaseChatRepository(supabase)
+  // 処理中に「あとどれくらいか」を出すため、過去の実績から予測を作る
+  const usageRepository = createSupabaseAiUsageRepository(supabase)
+
+  // 互いに依存しない取得を束ねる。順に待つと待ち時間が足し算になる
+  const [{ data: project }, user, indexedChunks, buildEstimate, answerEstimate] =
+    await Promise.all([
+      supabase.from('projects').select('id, name').eq('id', projectId).maybeSingle(),
+      getCurrentUser(),
+      chunks.countByProject(projectId),
+      loadEstimate(usageRepository, 'build_index'),
+      loadEstimate(usageRepository, 'answer_question'),
+    ])
 
   if (!project) notFound()
 
-  const user = await getCurrentUser()
-
-  const chunks = createSupabaseFileChunkRepository(supabase)
-  const chat = createSupabaseChatRepository(supabase)
-
-  const indexedChunks = await chunks.countByProject(projectId)
-
+  // ここだけは利用者が決まってからでないと引けない
   const session = user
     ? await chat.findOrCreateSession({ projectId, userId: user.id })
     : null
   const messages = session ? await chat.listMessages(session.id) : []
 
-  // 処理中に「あとどれくらいか」を出すため、過去の実績から予測を作る
-  const usageRepository = createSupabaseAiUsageRepository(supabase)
-  const estimates = {
-    build_index: await loadEstimate(usageRepository, 'build_index'),
-    answer_question: await loadEstimate(usageRepository, 'answer_question'),
-  }
+  const estimates = { build_index: buildEstimate, answer_question: answerEstimate }
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>

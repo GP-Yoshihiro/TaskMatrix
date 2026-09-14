@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
+import { LoadError } from '@/components/ui/load-error'
+import { attempt } from '@/lib/domain/load-result'
 import { TaskManager } from '@/components/features/tasks/task-manager'
 import { createSupabaseMemberRepository } from '@/lib/repositories/members'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
@@ -16,9 +18,10 @@ export default async function TasksPage({
   // 両者は互いに依存しない。順に待つと待ち時間が足し算になる。
   // 行レベルセキュリティにより、他人のプロジェクトなら
   // どちらも空で返るため、先に取得しても情報は漏れない
-  const [{ data: project }, tasks, members] = await Promise.all([
+  const [{ data: project }, taskResult, members] = await Promise.all([
     supabase.from('projects').select('id, name').eq('id', projectId).maybeSingle(),
-    createSupabaseTaskRepository(supabase).listByProject(projectId),
+    // 読めなくても画面は出す。真っ白では、故障なのか権限なのか手掛かりが残らない
+    attempt(() => createSupabaseTaskRepository(supabase).listByProject(projectId), [], 'タスク'),
     // 名簿が読めなくてもタスクは出す。担当を選べないだけで、操作は続けられる
     createSupabaseMemberRepository(supabase)
       .listMembers(projectId)
@@ -26,6 +29,8 @@ export default async function TasksPage({
   ])
 
   if (!project) notFound()
+
+  const tasks = taskResult.ok ? taskResult.data : taskResult.fallback
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -36,6 +41,8 @@ export default async function TasksPage({
         title="タスク"
         description="AI が抽出したタスクと、手で追加したタスクの一覧です。"
       />
+      {!taskResult.ok && <LoadError what="タスク" />}
+
       <TaskManager
         projectId={projectId}
         tasks={tasks}
