@@ -13,6 +13,7 @@ const WEEK = { start: '2026-09-13', end: '2026-09-19' }
 function entry(overrides: Record<string, unknown> = {}) {
   return {
     id: 'e1',
+    taskId: 't-e1',
     label: '基礎工事',
     assignee: '田中',
     startsAt: '2026-09-14T01:00:00Z',

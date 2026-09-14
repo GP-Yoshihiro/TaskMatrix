@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import { ScheduleGantt } from '@/components/features/schedule/schedule-gantt'
 
@@ -10,6 +10,7 @@ const WEEK = { start: '2026-09-13', end: '2026-09-19' }
 const ENTRIES: CalendarEntry[] = [
   {
     id: 'a',
+    taskId: 't-a',
     label: '基礎工事',
     assignee: '田中',
     startsAt: '2026-09-14T01:00:00.000Z', // 日本時間 10:00
@@ -18,6 +19,7 @@ const ENTRIES: CalendarEntry[] = [
   },
   {
     id: 'b',
+    taskId: 't-b',
     label: '内装工事',
     assignee: '鈴木',
     startsAt: '2026-09-16T01:00:00.000Z',
@@ -26,6 +28,7 @@ const ENTRIES: CalendarEntry[] = [
   },
   {
     id: 'c',
+    taskId: 't-c',
     label: '検査',
     assignee: '',
     startsAt: '2026-09-18T01:00:00.000Z',
@@ -212,5 +215,34 @@ describe('ScheduleGantt の複属の表示', () => {
 
     // 押しても何も起きないボタンは、押せると見せない
     expect(screen.getByRole('button', { name: /鈴木/ })).toBeDisabled()
+  })
+})
+
+describe('ScheduleGantt からタスクを開く', () => {
+  it('工程名を押すと、そのタスクを求める', async () => {
+    const onOpenTask = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <ScheduleGantt
+        entries={ENTRIES}
+        bounds={WEEK}
+        timezone={TZ}
+        sections={SECTIONS}
+        onOpenTask={onOpenTask}
+      />,
+    )
+
+    // 読み上げ上の名前は本文が優先される。title ではなく本文で探す
+    await user.click(screen.getByRole('button', { name: '基礎工事' }))
+
+    expect(onOpenTask).toHaveBeenCalledWith('t-a')
+  })
+
+  it('開く手段が無ければ、押せないようにする', () => {
+    // 押しても何も起きないものを、押せると見せない
+    render(<ScheduleGantt entries={ENTRIES} bounds={WEEK} timezone={TZ} sections={SECTIONS} />)
+
+    expect(screen.getByRole('button', { name: '基礎工事' })).toBeDisabled()
   })
 })

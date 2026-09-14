@@ -35,12 +35,15 @@ export function ScheduleGantt({
   bounds,
   timezone,
   sections,
+  onOpenTask,
 }: {
   entries: CalendarEntry[]
   bounds: Bounds
   timezone: string
   /** 担当名から所属セクションを引く表。先頭が「最初の所属」 */
   sections: SectionsByAssignee
+  /** 工程名を押したとき。渡されなければ押せない */
+  onOpenTask?: (taskId: string) => void
 }) {
   const [sort, setSort] = useState<GanttSort>('start')
   /** 所属を開いている担当。既定では隠す */
@@ -155,6 +158,7 @@ export function ScheduleGantt({
                     ticks={ticks}
                     color={colors.get(row.assignee) ?? 'var(--color-accent)'}
                     others={otherSectionsOf(row.assignee, sections)}
+                    onOpenTask={onOpenTask}
                     open={openAssignee === row.assignee}
                     onToggle={() =>
                       setOpenAssignee(openAssignee === row.assignee ? null : row.assignee)
@@ -197,6 +201,7 @@ function GanttRow({
   others,
   open,
   onToggle,
+  onOpenTask,
 }: {
   row: GanttTaskRow
   ticks: { label: string; percent: number }[]
@@ -205,6 +210,7 @@ function GanttRow({
   others: string[]
   open: boolean
   onToggle: () => void
+  onOpenTask?: (taskId: string) => void
 }) {
   return (
     <div
@@ -226,13 +232,25 @@ function GanttRow({
           overflow: 'hidden',
         }}
       >
-        <span
-          title={row.label}
+        {/* 工程名を押すと、そのタスクの詳細を開く */}
+        <button
+          type="button"
+          title={onOpenTask ? `${row.label} の詳細を開く` : row.label}
+          onClick={() => onOpenTask?.(row.taskId)}
+          disabled={!onOpenTask}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 6,
+            width: '100%',
+            padding: 0,
+            background: 'none',
+            border: 'none',
+            textAlign: 'left',
+            font: 'inherit',
             fontSize: '0.75rem',
+            color: 'inherit',
+            cursor: onOpenTask ? 'pointer' : 'default',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
           }}
@@ -242,7 +260,7 @@ function GanttRow({
             style={{ width: 8, height: 8, borderRadius: 2, flexShrink: 0, background: color }}
           />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.label}</span>
-        </span>
+        </button>
 
         {/* 名前を押すと、他の所属を出す。既定では隠す */}
         <button

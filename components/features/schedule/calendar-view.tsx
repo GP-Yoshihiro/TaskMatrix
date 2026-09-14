@@ -61,11 +61,14 @@ export function CalendarView({
   entries,
   settings,
   sections,
+  onOpenTask,
 }: {
   entries: CalendarEntry[]
   settings: WorkSettings
   /** 担当名から所属セクションを引く表。ガントチャートの区切りに使う */
   sections: SectionsByAssignee
+  /** 工程名を押したとき */
+  onOpenTask?: (taskId: string) => void
 }) {
   const [range, setRange] = useState<CalendarRange>('month')
   const [anchor, setAnchor] = useState(() => todayKey(settings.timezone))
@@ -142,6 +145,7 @@ export function CalendarView({
           bounds={bounds}
           timezone={settings.timezone}
           sections={sections}
+          onOpenTask={onOpenTask}
         />
       )}
 

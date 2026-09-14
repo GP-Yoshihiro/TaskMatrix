@@ -9,6 +9,8 @@ import {
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import { CalendarView } from '@/components/features/schedule/calendar-view'
 import { OverwriteConfirmDialog } from '@/components/features/schedule/overwrite-confirm-dialog'
+import { TaskDetailDialog } from '@/components/features/schedule/task-detail-dialog'
+import type { Task } from '@/lib/repositories/tasks'
 import { type Conflict, ScheduleDraftItem } from '@/components/features/schedule/schedule-draft-item'
 import { findDuplicateTasks } from '@/lib/domain/schedule-overwrite'
 import { AiProgress } from '@/components/ui/ai-progress'
@@ -25,6 +27,7 @@ import type { ScheduleDraft } from '@/lib/usecases/plan-schedule'
 /** 重複検出のために、仮案と確定済みを同じ形に揃える */
 type Comparable = {
   id: string
+  taskId: string
   startsAt: string
   endsAt: string
   label: string
@@ -46,6 +49,8 @@ export function SchedulePlanner({
   estimate,
   assigneeByTaskId,
   sectionsByAssignee,
+  tasks,
+  members,
 }: {
   projectId: string
   confirmed: Schedule[]
@@ -56,6 +61,10 @@ export function SchedulePlanner({
   assigneeByTaskId: Record<string, string>
   /** 担当名から所属セクションを引く。ガントチャートの区切りに使う */
   sectionsByAssignee: Record<string, string[]>
+  /** 予定から詳細を開くためのタスク一覧 */
+  tasks: Task[]
+  /** 担当の選択肢 */
+  members: { id: string; name: string }[]
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -63,6 +72,8 @@ export function SchedulePlanner({
   const [message, setMessage] = useState<string | null>(null)
   const [warningOpen, setWarningOpen] = useState(false)
   const [overwriteOpen, setOverwriteOpen] = useState(false)
+  /** 詳細を開いているタスク。null なら閉じている */
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   // 算出だけを進捗表示の対象にする。確定の保存は AI を呼ばず一瞬で終わるため
   const [planning, setPlanning] = useState(false)
   const [lastRun, setLastRun] = useState<{ usage: AiUsage; durationMs: number } | null>(
@@ -78,6 +89,7 @@ export function SchedulePlanner({
   const comparables = useMemo<Comparable[]>(() => {
     const fromDrafts = (drafts ?? []).map((draft) => ({
       id: draft.key,
+      taskId: draft.taskId,
       startsAt: draft.startsAt,
       endsAt: draft.endsAt,
       label: draft.taskTitle,
@@ -86,6 +98,7 @@ export function SchedulePlanner({
     }))
     const fromConfirmed = confirmed.map((schedule) => ({
       id: schedule.id,
+      taskId: schedule.taskId,
       startsAt: schedule.startsAt,
       endsAt: schedule.endsAt,
       label: schedule.taskTitle,
@@ -102,6 +115,7 @@ export function SchedulePlanner({
         startsAt: draft.startsAt,
         endsAt: draft.endsAt,
         label: draft.taskTitle,
+        taskId: draft.taskId,
         assignee: assigneeByTaskId[draft.taskId] ?? '',
         kind: 'draft' as const,
       },
@@ -143,6 +157,7 @@ export function SchedulePlanner({
   /** カレンダーに出す予定。仮案は編集に追従して動く */
   const calendarEntries: CalendarEntry[] = comparables.map((item) => ({
     id: item.id,
+    taskId: item.taskId,
     label: item.label,
     assignee: item.assignee,
     startsAt: item.startsAt,
@@ -308,6 +323,19 @@ export function SchedulePlanner({
         entries={calendarEntries}
         settings={settings}
         sections={sectionsByAssignee}
+        onOpenTask={setOpenTaskId}
+      />
+
+      <TaskDetailDialog
+        task={tasks.find((task) => task.id === openTaskId) ?? null}
+        projectId={projectId}
+        members={members}
+        onClose={() => setOpenTaskId(null)}
+        onSaved={() => {
+          setOpenTaskId(null)
+          // 担当や想定日程が変われば、ガントチャートの見え方も変わる
+          router.refresh()
+        }}
       />
 
       {drafts && drafts.length > 0 && (

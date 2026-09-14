@@ -107,6 +107,8 @@ export default async function SchedulePage({
       <SchedulePlanner
         assigneeByTaskId={assigneeByTaskId}
         sectionsByAssignee={sectionsByAssignee}
+        tasks={tasks}
+        members={members.map((member) => ({ id: member.id, name: member.name }))}
         projectId={projectId}
         confirmed={confirmed}
         pendingTaskCount={pendingTaskCount}

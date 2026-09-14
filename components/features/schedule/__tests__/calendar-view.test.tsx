@@ -10,6 +10,7 @@ const SETTINGS = { ...DEFAULT_WORK_SETTINGS, timezone: 'Asia/Tokyo' }
 const ENTRIES: CalendarEntry[] = [
   {
     id: 'a',
+    taskId: 't-a',
     label: '資料作成',
     assignee: '田中',
     startsAt: '2026-09-14T01:00:00.000Z', // 日本時間 10:00
@@ -18,6 +19,7 @@ const ENTRIES: CalendarEntry[] = [
   },
   {
     id: 'b',
+    taskId: 't-b',
     label: '打ち合わせ',
     assignee: '鈴木',
     startsAt: '2026-09-16T05:00:00.000Z',
