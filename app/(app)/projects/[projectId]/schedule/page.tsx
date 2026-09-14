@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/page-header'
+import { LoadError } from '@/components/ui/load-error'
+import { attempt, firstFailure } from '@/lib/domain/load-result'
 import { GoogleCalendarPanel } from '@/components/features/schedule/google-calendar-panel'
 import { SchedulePlanner } from '@/components/features/schedule/schedule-planner'
 import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
@@ -38,15 +40,24 @@ export default async function SchedulePage({
 
   const user = await getCurrentUser()
 
-  const [tasks, confirmed, savedSettings, members] = await Promise.all([
-    createSupabaseTaskRepository(supabase).listByProject(projectId),
-    createSupabaseScheduleRepository(supabase).listByProject(projectId),
+  const [taskResult, scheduleResult, savedSettings, members] = await Promise.all([
+    // 読めなくても画面は出す。どちらが読めなかったかだけを知らせる
+    attempt(() => createSupabaseTaskRepository(supabase).listByProject(projectId), [], 'タスク'),
+    attempt(
+      () => createSupabaseScheduleRepository(supabase).listByProject(projectId),
+      [],
+      '予定',
+    ),
     user ? createSupabaseWorkSettingsRepository(supabase).find(user.id) : null,
     // 名簿が読めなくても予定は出す。区切りが使えないだけで、操作は続けられる
     createSupabaseMemberRepository(supabase)
       .listMembers(projectId)
       .catch(() => []),
   ])
+
+  const tasks = taskResult.ok ? taskResult.data : taskResult.fallback
+  const confirmed = scheduleResult.ok ? scheduleResult.data : scheduleResult.fallback
+  const failedToLoad = firstFailure([taskResult, scheduleResult])
 
   const settings = savedSettings ?? DEFAULT_WORK_SETTINGS
 
@@ -91,6 +102,8 @@ export default async function SchedulePage({
         title="スケジュール"
         description="未完了のタスクから予定を算出し、確定するとカレンダーに反映されます。"
       />
+      {failedToLoad !== null && <LoadError what={failedToLoad} />}
+
       <SchedulePlanner
         assigneeByTaskId={assigneeByTaskId}
         sectionsByAssignee={sectionsByAssignee}
