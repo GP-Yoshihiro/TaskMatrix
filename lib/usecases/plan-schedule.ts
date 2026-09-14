@@ -1,4 +1,5 @@
 import { type Result, err, ok } from '@/lib/domain/result'
+import { matchTaskTitle } from '@/lib/domain/match-task-title'
 import type { AiUsage } from '@/lib/domain/usage'
 import {
   DEFAULT_WORK_SETTINGS,
@@ -36,6 +37,11 @@ type Deps = {
 
 export type PlanScheduleOutput = {
   drafts: ScheduleDraft[]
+  /**
+   * もとのタスクに結び付かず、対象外にした提案の件数。
+   * 黙って捨てると「算出がうまくいかない」理由が分からなくなる
+   */
+  unmatchedCount: number
   confirmed: Schedule[]
   note: string
   settings: WorkSettings
@@ -85,15 +91,27 @@ export async function planScheduleForProject(
   if (!planned.ok) return planned
 
   const byTitle = new Map(pending.map((task) => [task.title, task]))
+  const titles = [...byTitle.keys()]
 
   const drafts: ScheduleDraft[] = []
+  let unmatchedCount = 0
+
   planned.data.schedules.forEach((proposal, index) => {
-    const task = byTitle.get(proposal.task_title)
-    if (!task) return
+    // 一字一句同じとは限らない。空白の違いや、分割の印を吸収する
+    const matched = matchTaskTitle(proposal.task_title, titles)
+    const task = matched ? byTitle.get(matched) : undefined
+
+    if (!task) {
+      unmatchedCount += 1
+      return
+    }
 
     const start = Date.parse(proposal.starts_at)
     const end = Date.parse(proposal.ends_at)
-    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+      unmatchedCount += 1
+      return
+    }
 
     const range = { startsAt: proposal.starts_at, endsAt: proposal.ends_at }
     const outOfWorkHours =
@@ -114,6 +132,7 @@ export async function planScheduleForProject(
 
   return ok({
     drafts,
+    unmatchedCount,
     confirmed,
     note: planned.data.overall_note,
     settings,

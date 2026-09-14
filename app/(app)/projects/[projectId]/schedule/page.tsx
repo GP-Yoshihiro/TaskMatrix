@@ -4,6 +4,7 @@ import { LoadError } from '@/components/ui/load-error'
 import { attempt, firstFailure } from '@/lib/domain/load-result'
 import { GoogleCalendarPanel } from '@/components/features/schedule/google-calendar-panel'
 import { SchedulePlanner } from '@/components/features/schedule/schedule-planner'
+import { checkDailyLimit, startOfJstDay } from '@/lib/domain/ai-limit'
 import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
@@ -40,7 +41,11 @@ export default async function SchedulePage({
 
   const user = await getCurrentUser()
 
-  const [taskResult, scheduleResult, savedSettings, members] = await Promise.all([
+  const now = new Date()
+  const usageRepository = createSupabaseAiUsageRepository(supabase)
+
+  const [taskResult, scheduleResult, savedSettings, members, todayUsage] =
+    await Promise.all([
     // 読めなくても画面は出す。どちらが読めなかったかだけを知らせる
     attempt(() => createSupabaseTaskRepository(supabase).listByProject(projectId), [], 'タスク'),
     attempt(
@@ -53,7 +58,12 @@ export default async function SchedulePage({
     createSupabaseMemberRepository(supabase)
       .listMembers(projectId)
       .catch(() => []),
+    // 残量が読めなくても画面は出す。表示が出ないだけ
+    usageRepository.usageSince(startOfJstDay(now).toISOString()).catch(() => null),
   ])
+
+  // 上限に達したときだけでなく、達する前から分かるようにする
+  const limit = todayUsage ? checkDailyLimit(todayUsage, now) : null
 
   const tasks = taskResult.ok ? taskResult.data : taskResult.fallback
   const confirmed = scheduleResult.ok ? scheduleResult.data : scheduleResult.fallback
@@ -108,6 +118,13 @@ export default async function SchedulePage({
         assigneeByTaskId={assigneeByTaskId}
         sectionsByAssignee={sectionsByAssignee}
         tasks={tasks}
+        aiLimit={
+          limit && {
+            remainingCalls: limit.remainingCalls,
+            remainingTokens: limit.remainingTokens,
+            allowed: limit.allowed,
+          }
+        }
         members={members.map((member) => ({ id: member.id, name: member.name }))}
         projectId={projectId}
         confirmed={confirmed}

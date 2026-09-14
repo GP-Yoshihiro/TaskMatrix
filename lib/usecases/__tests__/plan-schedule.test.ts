@@ -277,3 +277,69 @@ describe('planScheduleForProject', () => {
     }
   })
 })
+
+describe('提案とタスクの結び付け', () => {
+  it('分割の印が付いていても、捨てずに結び付ける', async () => {
+    // 「複数の日に分けて」と指示すると、AI が名前に印を足すことがある。
+    // 捨てると 1 件も出ず、原因も分からないまま算出が失敗して見える
+    const deps = makeDeps({
+      proposals: [
+        { ...goodProposal, task_title: '見積もりを提出する（1日目）' },
+        {
+          ...goodProposal,
+          task_title: '見積もりを提出する（2日目）',
+          starts_at: '2026-09-02T09:00:00+09:00',
+          ends_at: '2026-09-02T11:00:00+09:00',
+        },
+      ],
+    })
+
+    const result = await planScheduleForProject(deps, input)
+
+    if (!result.ok) throw new Error('算出できていない')
+    expect(result.data.drafts).toHaveLength(2)
+    expect(result.data.unmatchedCount).toBe(0)
+  })
+
+  it('空白の違いだけなら結び付ける', async () => {
+    const deps = makeDeps({
+      proposals: [{ ...goodProposal, task_title: '  見積もりを提出する ' }],
+    })
+
+    const result = await planScheduleForProject(deps, input)
+
+    if (!result.ok) throw new Error('算出できていない')
+    expect(result.data.drafts).toHaveLength(1)
+  })
+
+  it('結び付かない提案は、件数として返す', async () => {
+    // 黙って捨てない。理由が分からないまま 0 件になるのを防ぐ
+    const deps = makeDeps({
+      proposals: [{ ...goodProposal, task_title: 'まったく別の作業' }],
+    })
+
+    const result = await planScheduleForProject(deps, input)
+
+    if (!result.ok) throw new Error('算出できていない')
+    expect(result.data.drafts).toHaveLength(0)
+    expect(result.data.unmatchedCount).toBe(1)
+  })
+
+  it('日時が壊れた提案も、件数に数える', async () => {
+    const deps = makeDeps({
+      proposals: [{ ...goodProposal, ends_at: '2026-08-01T09:00:00+09:00' }],
+    })
+
+    const result = await planScheduleForProject(deps, input)
+
+    if (!result.ok) throw new Error('算出できていない')
+    expect(result.data.unmatchedCount).toBe(1)
+  })
+
+  it('すべて正しければ 0 件', async () => {
+    const result = await planScheduleForProject(makeDeps({}), input)
+
+    if (!result.ok) throw new Error('算出できていない')
+    expect(result.data.unmatchedCount).toBe(0)
+  })
+})

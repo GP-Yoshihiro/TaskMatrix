@@ -51,6 +51,7 @@ export function SchedulePlanner({
   sectionsByAssignee,
   tasks,
   members,
+  aiLimit,
 }: {
   projectId: string
   confirmed: Schedule[]
@@ -65,6 +66,8 @@ export function SchedulePlanner({
   tasks: Task[]
   /** 担当の選択肢 */
   members: { id: string; name: string }[]
+  /** 本日の AI の残り。読めなければ null */
+  aiLimit: { remainingCalls: number; remainingTokens: number; allowed: boolean } | null
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -192,8 +195,23 @@ export function SchedulePlanner({
         setNote(result.data.note)
         setLastRun({ usage: result.data.usage, durationMs: result.data.durationMs })
         setSelected(new Set(result.data.drafts.map((draft) => draft.key)))
+
+        /*
+         * 対象外になった提案があれば必ず伝える。
+         *
+         * 黙って捨てると「算出がうまくいかない」理由が分からない。
+         * 0 件になった場合は、その原因がここにあることが多い。
+         */
+        const dropped = result.data.unmatchedCount
+
         if (result.data.drafts.length === 0) {
-          setMessage('割り当てられる予定がありませんでした。')
+          setMessage(
+            dropped > 0
+              ? `割り当てられる予定がありませんでした（${dropped} 件の提案が、もとのタスクに結び付きませんでした）。もう一度お試しください。`
+              : '割り当てられる予定がありませんでした。',
+          )
+        } else if (dropped > 0) {
+          setMessage(`${dropped} 件の提案は、もとのタスクに結び付かなかったため除きました。`)
         }
       } else {
         setMessage(result.error.message)
@@ -273,12 +291,29 @@ export function SchedulePlanner({
     <section style={{ display: 'grid', gap: 12 }}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 className="tm-h2">スケジュール算出</h2>
-        <Button onClick={handlePlan} disabled={isPending || pendingTaskCount === 0}>
+        <Button
+          onClick={handlePlan}
+          disabled={isPending || pendingTaskCount === 0 || aiLimit?.allowed === false}
+        >
           {planning ? '処理中…' : 'スケジュールを算出'}
         </Button>
         <span style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>
           未完了タスク {pendingTaskCount} 件 / 確定済みの予定 {confirmed.length} 件
         </span>
+
+        {/* 上限に達したときだけでなく、達する前から分かるようにする */}
+        {aiLimit && (
+          <span
+            style={{
+              fontSize: '0.78rem',
+              color: aiLimit.allowed ? 'var(--color-fg-muted)' : 'var(--color-danger)',
+            }}
+          >
+            {aiLimit.allowed
+              ? `本日の AI の残り: ${aiLimit.remainingCalls} 回 / ${aiLimit.remainingTokens.toLocaleString('ja-JP')} トークン`
+              : 'AI の本日の上限に達しています。日本時間の 0 時を過ぎるとまた使えます。'}
+          </span>
+        )}
         {message && <span style={{ fontSize: '0.85rem' }}>{message}</span>}
       </div>
 
