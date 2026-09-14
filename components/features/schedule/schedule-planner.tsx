@@ -192,8 +192,23 @@ export function SchedulePlanner({
         setNote(result.data.note)
         setLastRun({ usage: result.data.usage, durationMs: result.data.durationMs })
         setSelected(new Set(result.data.drafts.map((draft) => draft.key)))
+
+        /*
+         * 対象外になった提案があれば必ず伝える。
+         *
+         * 黙って捨てると「算出がうまくいかない」理由が分からない。
+         * 0 件になった場合は、その原因がここにあることが多い。
+         */
+        const dropped = result.data.unmatchedCount
+
         if (result.data.drafts.length === 0) {
-          setMessage('割り当てられる予定がありませんでした。')
+          setMessage(
+            dropped > 0
+              ? `割り当てられる予定がありませんでした（${dropped} 件の提案が、もとのタスクに結び付きませんでした）。もう一度お試しください。`
+              : '割り当てられる予定がありませんでした。',
+          )
+        } else if (dropped > 0) {
+          setMessage(`${dropped} 件の提案は、もとのタスクに結び付かなかったため除きました。`)
         }
       } else {
         setMessage(result.error.message)
