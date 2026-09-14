@@ -5,6 +5,7 @@ import {
   missingColumnsFrom,
   summarizeSchemaChecks,
 } from '@/lib/domain/schema-check'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { createServiceSupabaseClient } from '@/lib/supabase/service'
 
 /**
@@ -20,6 +21,11 @@ import { createServiceSupabaseClient } from '@/lib/supabase/service'
  * 表の構造も確かめる。移行 SQL の適用漏れは 2 度起きており、
  * 外から確かめる手段が無いと、毎回やり取りを重ねて切り分けることになる。
  * ここでも**返すのは列の名前と有無だけ**で、データの中身は含めない。
+ *
+ * **詳細は管理者にだけ返す。**
+ * 設定の文字数や表・列の名前は、攻める側の手掛かりになる。
+ * ただし「設定が壊れてログインできない」ときの切り分けに使うため、
+ * 認証できない場合も**動いているかどうかだけ**は返す。
  */
 
 const REQUIRED = [
@@ -85,6 +91,28 @@ async function checkSchema(): Promise<{ ok: boolean; missing: string[] } | null>
   return summarizeSchemaChecks(checks)
 }
 
+/** この要求が管理者のものか。判定できなければ false */
+async function isAdmin(): Promise<boolean> {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return false
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    return Boolean(data?.is_admin)
+  } catch {
+    // 判定できないときは詳細を出さない
+    return false
+  }
+}
+
 export async function GET() {
   const configured: Record<string, ReturnType<typeof inspect>> = {}
   for (const name of REQUIRED) {
@@ -122,6 +150,15 @@ export async function GET() {
 
   const ok = canAuthenticate && schema?.ok !== false
 
+  const status = ok ? 200 : 503
+  const noStore = { 'Cache-Control': 'no-store' } as const
+
+  // 管理者でなければ、動いているかどうかだけを返す。
+  // 設定の文字数や表・列の名前は、攻める側の手掛かりになる
+  if (!(await isAdmin())) {
+    return NextResponse.json({ ok }, { status, headers: noStore })
+  }
+
   return NextResponse.json(
     {
       ok,
@@ -131,6 +168,6 @@ export async function GET() {
       // null は「調べられなかった」。問題なしとは区別する
       schema: schema ?? { ok: null, missing: [], note: '構造を確認できませんでした' },
     },
-    { status: ok ? 200 : 503, headers: { 'Cache-Control': 'no-store' } },
+    { status, headers: noStore },
   )
 }

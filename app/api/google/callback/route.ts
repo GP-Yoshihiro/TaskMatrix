@@ -54,14 +54,15 @@ export async function GET(request: NextRequest) {
     redirectUri: buildRedirectUri(request.nextUrl.origin),
   })
   if (!exchanged.ok) {
-    console.error('[google] コード交換に失敗:', exchanged.detail ?? exchanged.failure)
+    // 詳細は残さない。要求先や応答の中身が記録に残り続ける
+    console.error('[google] コード交換に失敗:', exchanged.failure)
     return back(request, 'failed')
   }
 
   // このアプリ専用のカレンダーを作る。既存のカレンダーには触れない
   const calendar = await createCalendar(exchanged.data.accessToken)
   if (!calendar.ok) {
-    console.error('[google] カレンダー作成に失敗:', calendar.detail ?? calendar.failure)
+    console.error('[google] カレンダー作成に失敗:', calendar.failure)
     return back(request, 'failed')
   }
 
@@ -75,8 +76,8 @@ export async function GET(request: NextRequest) {
       ),
       calendarId: calendar.data,
     })
-  } catch (error) {
-    console.error('[google] 接続の保存に失敗:', (error as Error)?.message)
+  } catch {
+    console.error('[google] 接続の保存に失敗')
     return back(request, 'failed')
   }
 
