@@ -64,6 +64,27 @@ export function TaskManager({
     })
   }
 
+  /**
+   * 編集枠。選んだ行の直下に出す。
+   *
+   * 一覧と一覧（ボード）の両方から同じものを使う。
+   * 描き分けると、片方だけ挙動が変わる。
+   */
+  function renderEditForm(task: Task) {
+    return (
+      <TaskForm
+        projectId={projectId}
+        members={members}
+        task={task}
+        onDone={() => {
+          setEditing(null)
+          router.refresh()
+        }}
+        onCancel={() => setEditing(null)}
+      />
+    )
+  }
+
   const cardProps = {
     pending: isPending,
     onEdit: (task: Task) => {
@@ -121,19 +142,6 @@ export function TaskManager({
         />
       )}
 
-      {editing && (
-        <TaskForm
-          projectId={projectId}
-          members={members}
-          task={editing}
-          onDone={() => {
-            setEditing(null)
-            router.refresh()
-          }}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-
       {tasks.length === 0 ? (
         <p style={{ color: 'var(--color-fg-muted)' }}>
           タスクがまだありません。ファイル画面の「AI タスク抽出」から作るか、
@@ -142,8 +150,11 @@ export function TaskManager({
       ) : view === 'list' ? (
         <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 10 }}>
           {sorted.map((task) => (
-            <li key={task.id}>
+            <li key={task.id} style={{ display: 'grid', gap: 10 }}>
               <TaskCard task={task} showStatus {...cardProps} />
+              {/* 編集枠は選んだ行の直下に出す。一覧の先頭に出すと、
+                  どれを編集しているのかが分からなくなる */}
+              {editing?.id === task.id && renderEditForm(task)}
             </li>
           ))}
         </ul>
@@ -177,7 +188,10 @@ export function TaskManager({
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-fg-muted)' }}>なし</p>
               ) : (
                 grouped[status].map((task) => (
-                  <TaskCard key={task.id} task={task} showStatus={false} {...cardProps} />
+                  <div key={task.id} style={{ display: 'grid', gap: 10 }}>
+                    <TaskCard task={task} showStatus={false} {...cardProps} />
+                    {editing?.id === task.id && renderEditForm(task)}
+                  </div>
                 ))
               )}
             </section>
