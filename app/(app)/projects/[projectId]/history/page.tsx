@@ -19,14 +19,6 @@ export default async function HistoryPage({
   const query = await searchParams
   const supabase = await createServerSupabaseClient()
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id, name')
-    .eq('id', projectId)
-    .maybeSingle()
-
-  if (!project) notFound()
-
   // ファイル画面から開いたときは、そのファイルで絞り込んだ状態にする
   const filter = parseFilter(
     new URLSearchParams(
@@ -42,8 +34,11 @@ export default async function HistoryPage({
   // 容量が上限に近づいていれば、ここで古い履歴を整理する。
   // 定期実行の仕組みが無いため、履歴を見る操作に合わせて行う。
   // 失敗しても画面は出す（整理は付随的な処理のため）
-  try {
-    await purgeHistory(
+  // プロジェクト名・タグ・整理は互いに依存しない。順に待つと待ち時間が足し算になる
+  const [{ data: project }, tags] = await Promise.all([
+    supabase.from('projects').select('id, name').eq('id', projectId).maybeSingle(),
+    tagRepository.listByProject(projectId),
+    purgeHistory(
       {
         databaseSizeBytes: async () => {
           const { data } = await supabase.rpc('database_size_bytes')
@@ -53,20 +48,19 @@ export default async function HistoryPage({
         deleteOldest: (input) => history.deleteOldest(input),
       },
       projectId,
-    )
-  } catch {
-    // 整理できなくても履歴は見られる
-  }
-
-  const [entries, tags] = await Promise.all([
-    history.listByProject({
-      projectId,
-      order: 'desc',
-      limit: HISTORY_PAGE_SIZE,
-      filter,
-    }),
-    tagRepository.listByProject(projectId),
+      // 整理できなくても履歴は見られる
+    ).catch(() => {}),
   ])
+
+  if (!project) notFound()
+
+  // 一覧は整理のあとに引く。先に引くと、直後に消える行を並べてしまう
+  const entries = await history.listByProject({
+    projectId,
+    order: 'desc',
+    limit: HISTORY_PAGE_SIZE,
+    filter,
+  })
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
