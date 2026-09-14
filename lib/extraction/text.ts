@@ -1,8 +1,17 @@
 import { type SupportedFileType, parseOffice } from 'officeparser'
 import { ALLOWED_EXTENSIONS, getExtension } from '@/lib/domain/files'
 
-/** officeparser に渡せる形式かどうかを判定する */
+/**
+ * officeparser に渡せる形式かどうかを判定する。
+ *
+ * CSV は対応形式に含めるが、officeparser は扱わない。
+ * 中身は文字なので、変換を通さずそのまま読む。
+ */
+const NOT_FOR_OFFICE_PARSER = ['csv'] as const
+
 function toSupportedFileType(extension: string): SupportedFileType | undefined {
+  if ((NOT_FOR_OFFICE_PARSER as readonly string[]).includes(extension)) return undefined
+
   const supported = (ALLOWED_EXTENSIONS as readonly string[]).includes(extension)
   return supported ? (extension as SupportedFileType) : undefined
 }

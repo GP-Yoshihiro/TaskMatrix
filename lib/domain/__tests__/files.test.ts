@@ -73,8 +73,9 @@ describe('validateUpload', () => {
     expect(MAX_FILE_SIZE).toBe(25 * 1024 * 1024)
   })
 
-  it('対応拡張子は6種類である', () => {
+  it('対応拡張子は7種類である', () => {
     expect([...ALLOWED_EXTENSIONS].sort()).toEqual([
+      'csv',
       'docx',
       'md',
       'pdf',
@@ -148,5 +149,24 @@ describe('normalizeLineEndings', () => {
 
   it('CR を含まない文字列をそのまま返す', () => {
     expect(normalizeLineEndings('あいうえお')).toBe('あいうえお')
+  })
+})
+
+describe('ALLOWED_EXTENSIONS', () => {
+  it('表計算・文書・スライド・PDF・テキストに対応する', () => {
+    for (const extension of ['xlsx', 'docx', 'pptx', 'pdf', 'txt', 'md', 'csv']) {
+      expect(ALLOWED_EXTENSIONS as readonly string[]).toContain(extension)
+    }
+  })
+
+  it('CSV を受け付ける', () => {
+    // 対応形式から外れていたため、アップロードできなかった
+    expect(validateUpload({ name: '名簿.csv', size: 100 }).ok).toBe(true)
+  })
+
+  it('CSV はテキストとして保存する', () => {
+    const result = validateUpload({ name: '名簿.csv', size: 100 })
+    if (!result.ok) throw new Error('通っていない')
+    expect(result.data.kind).toBe('text')
   })
 })

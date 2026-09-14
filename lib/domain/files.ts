@@ -4,7 +4,15 @@ import { type Result, err, ok } from './result'
 export const MAX_FILE_SIZE = 25 * 1024 * 1024
 
 /** アップロードを許可する拡張子 */
-export const ALLOWED_EXTENSIONS = ['xlsx', 'docx', 'pptx', 'pdf', 'txt', 'md'] as const
+export const ALLOWED_EXTENSIONS = [
+  'xlsx',
+  'docx',
+  'pptx',
+  'pdf',
+  'txt',
+  'md',
+  'csv',
+] as const
 
 export type AllowedExtension = (typeof ALLOWED_EXTENSIONS)[number]
 
@@ -29,7 +37,8 @@ export function normalizeLineEndings(text: string): string {
 export function detectFileKind(filename: string): FileKind {
   const extension = getExtension(filename)
   if (extension === 'md') return 'markdown'
-  if (extension === 'txt') return 'text'
+  // CSV の中身は文字。そのまま読めるので、変換を通さずテキストとして扱う
+  if (extension === 'txt' || extension === 'csv') return 'text'
   return 'binary'
 }
 
