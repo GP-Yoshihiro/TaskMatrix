@@ -18,6 +18,8 @@ export type Bounds = {
 
 export type GanttSource = {
   id: string
+  /** もとになったタスク。予定から詳細を開くために持つ */
+  taskId: string
   /** 作業工程名。行の見出しになる */
   label: string
   /** 担当。空文字は未設定として扱う */
@@ -41,6 +43,8 @@ export type GanttBar = {
 export type GanttTaskRow = {
   /** 行の識別子。工程名と担当の組 */
   key: string
+  /** もとになったタスク。行の中では同じものになる */
+  taskId: string
   /** 左に出す工程名 */
   label: string
   assignee: string
@@ -201,6 +205,7 @@ export function buildGanttTaskRows(
     } else {
       rows.set(key, {
         key,
+        taskId: entry.taskId,
         label: entry.label,
         assignee,
         bars: [bar],
@@ -213,6 +218,7 @@ export function buildGanttTaskRows(
     .sort((a, b) => a.firstStart - b.firstStart)
     .map((row) => ({
       key: row.key,
+      taskId: row.taskId,
       label: row.label,
       assignee: row.assignee,
       bars: [...row.bars].sort((a, b) => a.leftPercent - b.leftPercent),

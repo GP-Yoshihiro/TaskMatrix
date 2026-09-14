@@ -8,6 +8,8 @@ const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
 export type CalendarEntry = {
   id: string
+  /** もとになったタスク。予定から詳細を開くために持つ */
+  taskId: string
   label: string
   /** 担当。ガントチャートの色分けに使う。空文字は未設定 */
   assignee: string
