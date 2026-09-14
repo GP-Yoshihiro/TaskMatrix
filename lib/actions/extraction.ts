@@ -1,6 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import {
+  AI_USAGE_PATHS,
+  type MutationKind,
+  pathsToRefresh,
+} from '@/lib/domain/revalidate-targets'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
@@ -34,6 +39,21 @@ function createLimitNotifier(supabase: SupabaseClient, userId: string) {
       reason,
     })
   }
+}
+
+/** 更新の影響が及ぶ画面をまとめて作り直す */
+function refreshPages(kind: MutationKind, projectId: string): void {
+  for (const path of pathsToRefresh(kind, projectId)) revalidatePath(path)
+}
+
+/**
+ * AI を使ったあとに作り直す画面。
+ *
+ * 使用量の記録が増えるため、残量の表示が古いままにならないようにする。
+ * 上限に達したときの知らせはホームに出る。
+ */
+function refreshAiUsage(): void {
+  for (const path of AI_USAGE_PATHS) revalidatePath(path)
 }
 
 export async function extractTasksAction(
@@ -124,7 +144,8 @@ export async function registerTasksAction(formData: FormData): Promise<Result<nu
       })),
     )
 
-    revalidatePath(`/projects/${projectId}/tasks`)
+    refreshPages('task', projectId)
+    refreshAiUsage()
     return ok(count)
   } catch {
     return err('UNKNOWN', 'タスクを登録できませんでした。')

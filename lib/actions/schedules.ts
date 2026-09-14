@@ -1,6 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import {
+  AI_USAGE_PATHS,
+  type MutationKind,
+  pathsToRefresh,
+} from '@/lib/domain/revalidate-targets'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
@@ -52,6 +57,21 @@ function createLimitNotifier(supabase: SupabaseClient, userId: string) {
   }
 }
 
+/** 更新の影響が及ぶ画面をまとめて作り直す */
+function refreshPages(kind: MutationKind, projectId: string): void {
+  for (const path of pathsToRefresh(kind, projectId)) revalidatePath(path)
+}
+
+/**
+ * AI を使ったあとに作り直す画面。
+ *
+ * 使用量の記録が増えるため、残量の表示が古いままにならないようにする。
+ * 上限に達したときの知らせはホームに出る。
+ */
+function refreshAiUsage(): void {
+  for (const path of AI_USAGE_PATHS) revalidatePath(path)
+}
+
 export async function planScheduleAction(
   formData: FormData,
 ): Promise<Result<WithUsage<PlanScheduleOutput>>> {
@@ -68,7 +88,7 @@ export async function planScheduleAction(
 
   try {
     const settings = await workSettings.find(user.id)
-    return await trackUsage(
+    const planned = await trackUsage(
       createSupabaseAiUsageRepository(supabase),
       { userId: user.id, projectId, operation: 'plan_schedule', onLimitReached: createLimitNotifier(supabase, user.id) },
       () =>
@@ -86,6 +106,11 @@ export async function planScheduleAction(
           },
         ),
     )
+
+    // 成否にかかわらず使用量は記録される。残量の表示が古いままにならないようにする
+    refreshAiUsage()
+
+    return planned
   } catch {
     return err('UNKNOWN', 'スケジュールを算出できませんでした。')
   }
@@ -213,7 +238,7 @@ export async function confirmSchedulesAction(formData: FormData): Promise<Result
       // 書き出しの失敗は確定の可否に影響させない
     }
 
-    revalidatePath(`/projects/${projectId}/schedule`)
+    refreshPages('schedule', projectId)
     return ok(count)
   } catch {
     return err('UNKNOWN', '予定を確定できませんでした。')
