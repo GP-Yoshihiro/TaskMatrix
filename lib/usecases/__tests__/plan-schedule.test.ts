@@ -52,6 +52,7 @@ function makeDeps(overrides: {
     createMany: vi.fn(async () => 0),
     update: vi.fn(async () => {}),
     remove: vi.fn(async () => {}),
+    removeMany: vi.fn(async () => 0),
   }
 
   const scheduleRepo: ScheduleRepository = {

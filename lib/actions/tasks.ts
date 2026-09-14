@@ -124,6 +124,41 @@ export async function moveTaskAction(formData: FormData): Promise<Result<null>> 
   return ok(null)
 }
 
+/**
+ * 選んだタスクをまとめて消す。
+ *
+ * 消せた件数を返す。求めた数と違えば、画面でその旨を伝えられる。
+ * （行レベルセキュリティにより、他人のタスクは消えない）
+ */
+export async function deleteTasksAction(formData: FormData): Promise<Result<number>> {
+  const projectId = String(formData.get('projectId') ?? '')
+  const raw = String(formData.get('ids') ?? '')
+
+  let ids: string[]
+  try {
+    ids = JSON.parse(raw) as string[]
+  } catch {
+    return err('VALIDATION_ERROR', '対象のタスクを解釈できませんでした。')
+  }
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return err('VALIDATION_ERROR', '削除するタスクを選んでください。')
+  }
+
+  const { supabase, user } = await context()
+  if (!user) return err('UNAUTHENTICATED', 'ログインが必要です。')
+
+  let removed = 0
+  try {
+    removed = await createSupabaseTaskRepository(supabase).removeMany(ids)
+  } catch {
+    return err('UNKNOWN', 'タスクを削除できませんでした。')
+  }
+
+  refreshPages('task', projectId)
+  return ok(removed)
+}
+
 export async function deleteTaskAction(formData: FormData): Promise<Result<null>> {
   const projectId = String(formData.get('projectId') ?? '')
   const id = String(formData.get('id') ?? '')
