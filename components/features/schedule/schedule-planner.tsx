@@ -6,7 +6,8 @@ import {
   type OverlapPair,
   OverlapWarningDialog,
 } from '@/components/features/schedule/overlap-warning-dialog'
-import { type CalendarEntry, CalendarMonth } from '@/components/features/schedule/calendar-month'
+import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
+import { CalendarView } from '@/components/features/schedule/calendar-view'
 import { type Conflict, ScheduleDraftItem } from '@/components/features/schedule/schedule-draft-item'
 import { AiProgress } from '@/components/ui/ai-progress'
 import { AiUsageNote } from '@/components/ui/ai-usage-note'
@@ -254,7 +255,7 @@ export function SchedulePlanner({
         )}
       </div>
 
-      <CalendarMonth entries={calendarEntries} settings={settings} />
+      <CalendarView entries={calendarEntries} settings={settings} />
 
       {drafts && drafts.length > 0 && (
         <Card style={{ display: 'grid', gap: 12 }}>
