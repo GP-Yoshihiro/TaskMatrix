@@ -16,8 +16,8 @@ function buildLimitMessage(decision: ReturnType<typeof checkDailyLimit>): string
 
   const what =
     decision.reason === 'calls'
-      ? `本日の実行回数の上限（${decision.callLimit} 回）`
-      : `本日の使用量の上限（${decision.tokenLimit.toLocaleString('ja-JP')} トークン）`
+      ? `AI の本日の実行回数の上限（${decision.callLimit} 回）`
+      : `AI の本日の使用量の上限（${decision.tokenLimit.toLocaleString('ja-JP')} トークン）`
 
   return `${what}に達しました。${at} を過ぎると、また使えるようになります。`
 }

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { attemptTimeout, deadlineFrom } from '@/lib/domain/ai-budget'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { AiUsage } from '@/lib/domain/usage'
 import { readUsage } from './usage'
@@ -30,7 +31,7 @@ const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash'
  * Server Action の maxDuration (120 秒) より短くし、
  * 打ち切られる前に日本語のエラーを返せるようにする。
  */
-const REQUEST_TIMEOUT_MS = 90_000
+// 1 回ごとの上限は置かない。全体の持ち時間から、その都度分け与える
 
 function isRetryable(error: unknown): boolean {
   if (error instanceof TimeoutError) return true
@@ -74,7 +75,19 @@ export function createGeminiTaskExtractor(): TaskExtractor {
             ]
           : [{ type: 'text', text: buildPrompt(input.text) }]
 
+      // 全体の持ち時間を決め、各回はその残りを分け合う。
+      // 1 回ごとに上限を置くと、予備のモデルを試した合計が画面側の上限を超える
+      const deadlineAt = deadlineFrom(Date.now())
+      let ranOutOfTime = false
+
       for (const model of models) {
+        const timeoutMs = attemptTimeout(deadlineAt, Date.now())
+        if (timeoutMs === null) {
+          // 必ず切れる呼び出しは始めない
+          ranOutOfTime = true
+          break
+        }
+
         try {
           const interaction = await withTimeout(
             ai.interactions.create({
@@ -86,7 +99,7 @@ export function createGeminiTaskExtractor(): TaskExtractor {
               schema: EXTRACTION_SCHEMA,
             },
             } as Parameters<typeof ai.interactions.create>[0]),
-            REQUEST_TIMEOUT_MS,
+            timeoutMs,
           )
 
           const outputText = (interaction as { output_text?: string }).output_text ?? ''
@@ -98,6 +111,7 @@ export function createGeminiTaskExtractor(): TaskExtractor {
             usage: readUsage(interaction, model, inputChars),
           })
         } catch (error) {
+          if (error instanceof TimeoutError) ranOutOfTime = true
           if (!isRetryable(error)) {
             return err(
               'AI_REQUEST_FAILED',
@@ -106,6 +120,13 @@ export function createGeminiTaskExtractor(): TaskExtractor {
           }
           // 混雑していたら次のモデルを試す
         }
+      }
+
+      if (ranOutOfTime) {
+        return err(
+          'AI_TIMEOUT',
+          'タスクの抽出に時間がかかりすぎたため、中断しました。対象を減らしてお試しください。',
+        )
       }
 
       return err('AI_MODEL_UNAVAILABLE', 'AI が混雑しています。時間をおいてお試しください。')

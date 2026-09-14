@@ -13,6 +13,8 @@ export type AppErrorCode =
   | 'TEXT_EXTRACTION_FAILED'
   | 'AI_REQUEST_FAILED'
   | 'AI_MODEL_UNAVAILABLE'
+  /** 持ち時間を使い切った。混雑とは区別する */
+  | 'AI_TIMEOUT'
   | 'AI_RESPONSE_INVALID'
   | 'NO_SCHEDULABLE_TASKS'
   | 'INVALID_SCHEDULE_RANGE'
