@@ -6,6 +6,7 @@ import { hasAssignee, resolveAssignee } from '@/lib/domain/assignee'
 import { DEFAULT_WORK_SETTINGS } from '@/lib/domain/schedule'
 import { createSupabaseAiUsageRepository } from '@/lib/repositories/ai-usage'
 import { createSupabaseGoogleConnectionRepository } from '@/lib/repositories/google-connections'
+import { createSupabaseMemberRepository } from '@/lib/repositories/members'
 import { createSupabaseScheduleRepository } from '@/lib/repositories/schedules'
 import { createSupabaseTaskRepository } from '@/lib/repositories/tasks'
 import { createSupabaseWorkSettingsRepository } from '@/lib/repositories/work-settings'
@@ -37,15 +38,25 @@ export default async function SchedulePage({
 
   const user = await getCurrentUser()
 
-  const [tasks, confirmed, savedSettings] = await Promise.all([
+  const [tasks, confirmed, savedSettings, members] = await Promise.all([
     createSupabaseTaskRepository(supabase).listByProject(projectId),
     createSupabaseScheduleRepository(supabase).listByProject(projectId),
     user ? createSupabaseWorkSettingsRepository(supabase).find(user.id) : null,
+    // 名簿が読めなくても予定は出す。区切りが使えないだけで、操作は続けられる
+    createSupabaseMemberRepository(supabase)
+      .listMembers(projectId)
+      .catch(() => []),
   ])
 
   const settings = savedSettings ?? DEFAULT_WORK_SETTINGS
 
   const pendingTaskCount = tasks.filter((task) => task.status !== 'done').length
+
+  // 担当名から所属セクションを引く表。**先頭が「最初の所属」**になる。
+  // 複属の人はそこにだけ出し、他の所属は名前を押したときに見せる
+  const sectionsByAssignee = Object.fromEntries(
+    members.map((member) => [member.name, member.sections.map((section) => section.name)]),
+  )
 
   // ガントチャートの色分けに使う。予定は担当を持たないため、タスクから引く。
   // 名簿のメンバーが選ばれていればその名前、無ければ自由入力の文字
@@ -82,6 +93,7 @@ export default async function SchedulePage({
       />
       <SchedulePlanner
         assigneeByTaskId={assigneeByTaskId}
+        sectionsByAssignee={sectionsByAssignee}
         projectId={projectId}
         confirmed={confirmed}
         pendingTaskCount={pendingTaskCount}

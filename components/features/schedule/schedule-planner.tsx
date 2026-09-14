@@ -43,6 +43,7 @@ export function SchedulePlanner({
   settings,
   estimate,
   assigneeByTaskId,
+  sectionsByAssignee,
 }: {
   projectId: string
   confirmed: Schedule[]
@@ -51,6 +52,8 @@ export function SchedulePlanner({
   estimate: Estimate
   /** タスク ID から担当を引く。ガントチャートの色分けに使う */
   assigneeByTaskId: Record<string, string>
+  /** 担当名から所属セクションを引く。ガントチャートの区切りに使う */
+  sectionsByAssignee: Record<string, string[]>
 }) {
   const [drafts, setDrafts] = useState<ScheduleDraft[] | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -264,7 +267,11 @@ export function SchedulePlanner({
         )}
       </div>
 
-      <CalendarView entries={calendarEntries} settings={settings} />
+      <CalendarView
+        entries={calendarEntries}
+        settings={settings}
+        sections={sectionsByAssignee}
+      />
 
       {drafts && drafts.length > 0 && (
         <Card style={{ display: 'grid', gap: 12 }}>

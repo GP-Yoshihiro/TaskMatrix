@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { CalendarEntry } from '@/components/features/schedule/calendar-month'
 import { ScheduleGantt } from '@/components/features/schedule/schedule-gantt'
@@ -33,8 +34,16 @@ const ENTRIES: CalendarEntry[] = [
   },
 ]
 
-function setup(entries = ENTRIES) {
-  return render(<ScheduleGantt entries={entries} bounds={WEEK} timezone={TZ} />)
+// 田中は基礎班と内装班に複属、鈴木は内装班のみ
+const SECTIONS = {
+  田中: ['基礎班', '内装班'],
+  鈴木: ['内装班'],
+}
+
+function setup(entries = ENTRIES, sections: Record<string, string[]> = SECTIONS) {
+  return render(
+    <ScheduleGantt entries={entries} bounds={WEEK} timezone={TZ} sections={sections} />,
+  )
 }
 
 describe('ScheduleGantt の向き', () => {
@@ -72,10 +81,11 @@ describe('ScheduleGantt の担当による色分け', () => {
   it('担当ごとに凡例を出す', () => {
     setup()
 
-    expect(screen.getByText('田中')).toBeInTheDocument()
-    expect(screen.getByText('鈴木')).toBeInTheDocument()
+    // 名前は凡例と各行の両方に出るため、件数では絞らない
+    expect(screen.getAllByText(/田中/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/鈴木/).length).toBeGreaterThan(0)
     // 担当が空のものは未設定として扱う
-    expect(screen.getByText('未設定')).toBeInTheDocument()
+    expect(screen.getAllByText(/未設定/).length).toBeGreaterThan(0)
   })
 
   it('担当が違えば違う色になる', () => {
@@ -121,5 +131,86 @@ describe('ScheduleGantt の補足表示', () => {
     setup([])
 
     expect(screen.getByText('この期間に予定はありません。')).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleGantt の並べ替え', () => {
+  it('開始日順・担当ごと・セクションごとを選べる', () => {
+    setup()
+
+    for (const label of ['開始日順', '担当ごと', 'セクションごと']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('はじめは開始日順で、見出しを出さない', () => {
+    setup()
+
+    expect(screen.getByRole('button', { name: '開始日順' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.queryByText('1 件')).not.toBeInTheDocument()
+  })
+
+  it('担当ごとに切り替えると、担当の見出しが出る', async () => {
+    const user = userEvent.setup()
+    setup()
+
+    await user.click(screen.getByRole('button', { name: '担当ごと' }))
+
+    // 見出しには件数を添える
+    expect(screen.getAllByText('1 件').length).toBeGreaterThan(0)
+  })
+
+  it('セクションごとに切り替えると、セクションの見出しが出る', async () => {
+    const user = userEvent.setup()
+    setup()
+
+    await user.click(screen.getByRole('button', { name: 'セクションごと' }))
+
+    expect(screen.getByText('基礎班')).toBeInTheDocument()
+  })
+
+  it('複属の人は、最初の所属にだけ出す', async () => {
+    const user = userEvent.setup()
+    setup()
+
+    await user.click(screen.getByRole('button', { name: 'セクションごと' }))
+
+    // 田中は基礎班と内装班に属すが、見出しとして出るのは基礎班のみ。
+    // 内装班は鈴木の見出しとしてのみ現れる
+    expect(screen.getByText(/最初の所属にだけ出しています/)).toBeInTheDocument()
+  })
+})
+
+describe('ScheduleGantt の複属の表示', () => {
+  it('他の所属は、はじめは出さない', () => {
+    setup()
+
+    // 既定で全部出すと、画面が名前で埋まる
+    expect(screen.queryByText(/（内装班）/)).not.toBeInTheDocument()
+  })
+
+  it('複属していることは、件数で示す', () => {
+    setup()
+
+    expect(screen.getByText(/田中 ＋1/)).toBeInTheDocument()
+  })
+
+  it('名前を押すと、他の所属が出る', async () => {
+    const user = userEvent.setup()
+    setup()
+
+    await user.click(screen.getByRole('button', { name: /田中/ }))
+
+    expect(screen.getByText(/田中（内装班）/)).toBeInTheDocument()
+  })
+
+  it('所属が 1 つの人は、押せないようにする', () => {
+    setup()
+
+    // 押しても何も起きないボタンは、押せると見せない
+    expect(screen.getByRole('button', { name: /鈴木/ })).toBeDisabled()
   })
 })
