@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { type MutationKind, pathsToRefresh } from '@/lib/domain/revalidate-targets'
 import { buildStoragePath, normalizeLineEndings, validateUpload } from '@/lib/domain/files'
 import { canDeleteFile, describeLockReason } from '@/lib/domain/tag'
 import { type Result, err, ok } from '@/lib/domain/result'
@@ -12,6 +13,11 @@ import { readAuthorName } from '@/lib/usecases/current-author'
 import { recordHistory } from '@/lib/usecases/record-history'
 
 const BUCKET = 'project-files'
+
+/** 更新の影響が及ぶ画面をまとめて作り直す */
+function refreshPages(kind: MutationKind, projectId: string): void {
+  for (const path of pathsToRefresh(kind, projectId)) revalidatePath(path)
+}
 
 export async function uploadFileAction(formData: FormData): Promise<Result<null>> {
   const projectId = String(formData.get('projectId') ?? '')
@@ -112,7 +118,7 @@ export async function uploadFileAction(formData: FormData): Promise<Result<null>
     return err('UNKNOWN', 'ファイルを登録できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}`)
+  refreshPages('file', projectId)
   return ok(null)
 }
 
@@ -187,7 +193,7 @@ export async function deleteFileAction(formData: FormData): Promise<Result<null>
     return err('UNKNOWN', 'ファイルを削除できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}`)
+  refreshPages('file', projectId)
   return ok(null)
 }
 

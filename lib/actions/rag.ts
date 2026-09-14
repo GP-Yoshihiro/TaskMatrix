@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { AI_USAGE_PATHS } from '@/lib/domain/revalidate-targets'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { type LimitReason, jstDateKey } from '@/lib/domain/limit-notification'
 import { createSupabaseLimitNotificationRepository } from '@/lib/repositories/limit-notifications'
@@ -35,6 +36,16 @@ function createLimitNotifier(supabase: SupabaseClient, userId: string) {
       reason,
     })
   }
+}
+
+/**
+ * AI を使ったあとに作り直す画面。
+ *
+ * 使用量の記録が増えるため、残量の表示が古いままにならないようにする。
+ * 上限に達したときの知らせはホームに出る。
+ */
+function refreshAiUsage(): void {
+  for (const path of AI_USAGE_PATHS) revalidatePath(path)
 }
 
 export async function buildIndexAction(
@@ -74,6 +85,8 @@ export async function buildIndexAction(
     )
 
     if (result.ok) revalidatePath(`/projects/${projectId}/chat`)
+    // 成否にかかわらず使用量は記録される
+    refreshAiUsage()
     return result
   } catch {
     return err('UNKNOWN', '検索用データを作成できませんでした。')
@@ -112,6 +125,8 @@ export async function askAction(
     )
 
     if (result.ok) revalidatePath(`/projects/${projectId}/chat`)
+    // 成否にかかわらず使用量は記録される
+    refreshAiUsage()
     return result
   } catch {
     return err('UNKNOWN', '回答を作成できませんでした。')

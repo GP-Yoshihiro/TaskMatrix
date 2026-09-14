@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { type MutationKind, pathsToRefresh } from '@/lib/domain/revalidate-targets'
 import { parseEstimatedDays } from '@/lib/domain/estimate-days'
 import { type Result, err, ok } from '@/lib/domain/result'
 import {
@@ -18,6 +19,11 @@ async function context() {
     data: { user },
   } = await supabase.auth.getUser()
   return { supabase, user }
+}
+
+/** 更新の影響が及ぶ画面をまとめて作り直す */
+function refreshPages(kind: MutationKind, projectId: string): void {
+  for (const path of pathsToRefresh(kind, projectId)) revalidatePath(path)
 }
 
 export async function createTaskAction(formData: FormData): Promise<Result<null>> {
@@ -57,7 +63,7 @@ export async function createTaskAction(formData: FormData): Promise<Result<null>
     return err('UNKNOWN', 'タスクを作成できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}/tasks`)
+  refreshPages('task', projectId)
   return ok(null)
 }
 
@@ -92,7 +98,7 @@ export async function updateTaskAction(formData: FormData): Promise<Result<null>
     return err('UNKNOWN', 'タスクを更新できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}/tasks`)
+  refreshPages('task', projectId)
   return ok(null)
 }
 
@@ -114,7 +120,7 @@ export async function moveTaskAction(formData: FormData): Promise<Result<null>> 
     return err('UNKNOWN', 'タスクを移動できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}/tasks`)
+  refreshPages('task', projectId)
   return ok(null)
 }
 
@@ -132,6 +138,6 @@ export async function deleteTaskAction(formData: FormData): Promise<Result<null>
     return err('UNKNOWN', 'タスクを削除できませんでした。')
   }
 
-  revalidatePath(`/projects/${projectId}/tasks`)
+  refreshPages('task', projectId)
   return ok(null)
 }
