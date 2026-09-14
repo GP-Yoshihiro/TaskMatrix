@@ -78,6 +78,15 @@ export async function planScheduleAction(
   const projectId = String(formData.get('projectId') ?? '')
   if (!projectId) return err('VALIDATION_ERROR', 'プロジェクトが指定されていません。')
 
+  // 算出の対象。多いときは画面で選んでもらう
+  let selectedTaskIds: string[] = []
+  try {
+    const raw = String(formData.get('taskIds') ?? '')
+    if (raw) selectedTaskIds = JSON.parse(raw) as string[]
+  } catch {
+    return err('VALIDATION_ERROR', '算出するタスクを解釈できませんでした。')
+  }
+
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },
@@ -103,6 +112,7 @@ export async function planScheduleAction(
             projectId,
             userId: user.id,
             today: todayIn(settings?.timezone ?? 'Asia/Tokyo'),
+            selectedTaskIds,
           },
         ),
     )
