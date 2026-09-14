@@ -22,30 +22,25 @@ export default async function FilePage({
   const { projectId, fileId } = await params
   const supabase = await createServerSupabaseClient()
 
-  const file = await createSupabaseFileRepository(supabase).findById(fileId)
+  const tagRepository = createSupabaseTagRepository(supabase)
+
+  // 版の取得だけはファイルの情報が要る。それ以外は互いに依存しないので束ねる。
+  // 順に待つと、待ち時間が足し算になる
+  const [file, { data: project }, fileTagList, projectTagList, estimate] =
+    await Promise.all([
+      createSupabaseFileRepository(supabase).findById(fileId),
+      // パンくずにプロジェクト名を出すため、名前だけ引く
+      supabase.from('projects').select('name').eq('id', projectId).maybeSingle(),
+      tagRepository.listByFile(fileId),
+      tagRepository.listByProject(projectId),
+      loadEstimate(createSupabaseAiUsageRepository(supabase), 'extract_tasks'),
+    ])
+
   if (!file) notFound()
 
   const latest = await createSupabaseFileVersionRepository(supabase).findByVersion(
     fileId,
     file.currentVersion,
-  )
-
-  // パンくずにプロジェクト名を出すため、名前だけ引く
-  const { data: project } = await supabase
-    .from('projects')
-    .select('name')
-    .eq('id', projectId)
-    .maybeSingle()
-
-  const tagRepository = createSupabaseTagRepository(supabase)
-  const [fileTagList, projectTagList] = await Promise.all([
-    tagRepository.listByFile(fileId),
-    tagRepository.listByProject(projectId),
-  ])
-
-  const estimate = await loadEstimate(
-    createSupabaseAiUsageRepository(supabase),
-    'extract_tasks',
   )
 
   return (
