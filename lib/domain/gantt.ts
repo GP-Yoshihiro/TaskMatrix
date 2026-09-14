@@ -1,9 +1,10 @@
 /**
  * ガントチャートの組み立て。
  *
- * **日付の軸を縦にとる。** 1 日 = 1 行とし、行の中の横位置がその日の時刻を表す。
- * 横軸に日付を並べると、1 件あたりの棒が細くなり、
- * 「その日の何時から何時か」が読み取れなくなる。
+ * **左の縦軸＝作業工程、上の横軸＝日付。** 棒は横に伸びる。
+ * 工程ごとに 1 行とし、その工程がいつからいつまでかを横位置で表す。
+ *
+ * 担当ごとに色を分ける。誰の受け持ちかを、行を読まずに見分けられるようにするため。
  *
  * 位置の基準は**稼働タイムゾーン**とする。実行環境の時刻で計算すると、
  * 利用者が見ている日付と棒の位置がずれる。
@@ -17,7 +18,10 @@ export type Bounds = {
 
 export type GanttSource = {
   id: string
+  /** 作業工程名。行の見出しになる */
   label: string
+  /** 担当。空文字は未設定として扱う */
+  assignee: string
   startsAt: string
   endsAt: string
   draft: boolean
@@ -25,25 +29,21 @@ export type GanttSource = {
 
 export type GanttBar = {
   id: string
-  label: string
   draft: boolean
-  /** その日の 0 時からの位置（0〜100） */
+  /** 範囲の左端からの位置（0〜100） */
   leftPercent: number
   /** 幅（0〜100） */
   widthPercent: number
-  /** 棒の長さだけでは正確な時刻が読めないため添える */
+  /** 棒の長さだけでは正確な期間が読めないため添える */
   timeLabel: string
-  /** 重なりを避けるための段。0 が最上段 */
-  lane: number
 }
 
-export type GanttDayRow = {
-  /** YYYY-MM-DD */
-  date: string
-  /** 左に出す見出し。例: 9/14（月） */
+export type GanttTaskRow = {
+  /** 行の識別子。工程名と担当の組 */
+  key: string
+  /** 左に出す工程名 */
   label: string
-  /** この行に必要な段数。予定が無くても 1 */
-  lanes: number
+  assignee: string
   bars: GanttBar[]
 }
 
@@ -52,12 +52,31 @@ export type GanttTick = {
   percent: number
 }
 
+/** 担当が入っていないときの表示 */
+export const UNASSIGNED_LABEL = '未設定'
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 /** 幅 0 だと画面から消え、予定があること自体が伝わらない */
-const MIN_WIDTH_PERCENT = 1.2
+const MIN_WIDTH_PERCENT = 0.6
 
-const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+/**
+ * 担当の色。明暗どちらの画面でも判別できる濃さに揃えている。
+ * 数を超えたら先頭へ戻る。
+ */
+const ASSIGNEE_PALETTE = [
+  '#2563eb',
+  '#059669',
+  '#d97706',
+  '#7c3aed',
+  '#db2777',
+  '#0891b2',
+  '#65a30d',
+  '#dc2626',
+] as const
+
+/** 未設定は目立たせない。担当が決まっている行を先に目に入れるため */
+const UNASSIGNED_COLOR = '#94a3b8'
 
 /** ある瞬間における、そのタイムゾーンの UTC からのずれ */
 function offsetMs(utcMs: number, timezone: string): number {
@@ -98,123 +117,156 @@ function startOfDayMs(dateKey: string, timezone: string): number {
   return guess - offsetMs(first, timezone)
 }
 
-function formatTime(ms: number, timezone: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
+function boundsMs(bounds: Bounds, timezone: string): { from: number; to: number } {
+  return {
+    from: startOfDayMs(bounds.start, timezone),
+    // 終わりの日も含めるため、その翌日の 0 時までとする
+    to: startOfDayMs(bounds.end, timezone) + DAY_MS,
+  }
+}
+
+function dayCount(bounds: Bounds): number {
+  const from = Date.parse(`${bounds.start}T00:00:00Z`)
+  const to = Date.parse(`${bounds.end}T00:00:00Z`)
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return 0
+  return Math.round((to - from) / DAY_MS) + 1
+}
+
+function formatSpan(startedAt: number, endedAt: number, timezone: string): string {
+  const date = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: timezone,
+    month: 'numeric',
+    day: 'numeric',
+  })
+  const time = new Intl.DateTimeFormat('ja-JP', {
     timeZone: timezone,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(ms))
-}
-
-/** 範囲に含まれる日付を並べる */
-function datesIn(bounds: Bounds): string[] {
-  const from = Date.parse(`${bounds.start}T00:00:00Z`)
-  const to = Date.parse(`${bounds.end}T00:00:00Z`)
-  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return []
-
-  const days = Math.round((to - from) / DAY_MS) + 1
-
-  return Array.from({ length: days }, (_, index) => {
-    return new Date(from + index * DAY_MS).toISOString().slice(0, 10)
   })
+
+  const from = `${date.format(new Date(startedAt))} ${time.format(new Date(startedAt))}`
+  const to = `${date.format(new Date(endedAt))} ${time.format(new Date(endedAt))}`
+
+  return `${from}〜${to}`
 }
 
-function dayLabel(dateKey: string): string {
-  const date = new Date(`${dateKey}T00:00:00Z`)
-  return `${date.getUTCMonth() + 1}/${date.getUTCDate()}（${WEEKDAY_LABELS[date.getUTCDay()]}）`
-}
-
-/**
- * 重なる予定に段を割り当てる。
- *
- * 同じ段に置くと、あとの棒が前の棒を覆って見えなくなる。
- * 空いている一番上の段へ順に入れる。
- */
-function assignLanes(
-  items: { startedAt: number; endedAt: number }[],
-): { lanes: number; laneOf: number[] } {
-  const laneEnds: number[] = []
-  const laneOf: number[] = []
-
-  for (const item of items) {
-    let lane = laneEnds.findIndex((endedAt) => endedAt <= item.startedAt)
-    if (lane < 0) {
-      lane = laneEnds.length
-      laneEnds.push(item.endedAt)
-    } else {
-      laneEnds[lane] = item.endedAt
-    }
-    laneOf.push(lane)
-  }
-
-  return { lanes: Math.max(1, laneEnds.length), laneOf }
-}
-
-/** 日付ごとの行に、その日の予定を並べる */
-export function buildGanttDayRows(
+/** 工程ごとの行に、その工程の予定を並べる */
+export function buildGanttTaskRows(
   entries: GanttSource[],
   bounds: Bounds,
   timezone: string,
-): GanttDayRow[] {
-  return datesIn(bounds).map((date) => {
-    const from = startOfDayMs(date, timezone)
-    const to = from + DAY_MS
-    const total = to - from
+): GanttTaskRow[] {
+  const { from, to } = boundsMs(bounds, timezone)
+  const total = to - from
+  if (total <= 0) return []
 
-    const inDay = entries
-      .map((entry) => {
-        const rawStart = Date.parse(entry.startsAt)
-        const rawEnd = Date.parse(entry.endsAt)
-        if (Number.isNaN(rawStart) || Number.isNaN(rawEnd)) return null
+  const rows = new Map<string, GanttTaskRow & { firstStart: number }>()
 
-        // 逆順に入っていても壊さない
-        const startedAt = Math.min(rawStart, rawEnd)
-        const endedAt = Math.max(rawStart, rawEnd)
+  for (const entry of entries) {
+    const rawStart = Date.parse(entry.startsAt)
+    const rawEnd = Date.parse(entry.endsAt)
+    if (Number.isNaN(rawStart) || Number.isNaN(rawEnd)) continue
 
-        // この日に重ならないものは出さない
-        if (endedAt <= from || startedAt >= to) return null
+    // 逆順に入っていても壊さない
+    const startedAt = Math.min(rawStart, rawEnd)
+    const endedAt = Math.max(rawStart, rawEnd)
 
-        return { entry, startedAt, endedAt }
+    // 表示範囲に重ならないものは出さない
+    if (endedAt <= from || startedAt >= to) continue
+
+    // はみ出したまま描くと、棒が枠の外へ出てしまう
+    const clippedStart = Math.max(startedAt, from)
+    const clippedEnd = Math.min(endedAt, to)
+
+    const leftPercent = ((clippedStart - from) / total) * 100
+    const rawWidth = ((clippedEnd - clippedStart) / total) * 100
+
+    const assignee = entry.assignee.trim() || UNASSIGNED_LABEL
+    // 同じ工程でも担当が違えば、色も責任も別なので行を分ける
+    const key = `${entry.label} ${assignee}`
+
+    const bar: GanttBar = {
+      id: entry.id,
+      draft: entry.draft,
+      leftPercent,
+      widthPercent: Math.min(100 - leftPercent, Math.max(MIN_WIDTH_PERCENT, rawWidth)),
+      timeLabel: formatSpan(startedAt, endedAt, timezone),
+    }
+
+    const existing = rows.get(key)
+    if (existing) {
+      existing.bars.push(bar)
+      existing.firstStart = Math.min(existing.firstStart, startedAt)
+    } else {
+      rows.set(key, {
+        key,
+        label: entry.label,
+        assignee,
+        bars: [bar],
+        firstStart: startedAt,
       })
-      .filter((item): item is { entry: GanttSource; startedAt: number; endedAt: number } => {
-        return item !== null
-      })
-      .sort((a, b) => a.startedAt - b.startedAt)
+    }
+  }
 
-    // 日をまたぐ予定は、この日の範囲で切る。
-    // 切らずに描くと、棒が行の外へはみ出す
-    const clipped = inDay.map((item) => ({
-      startedAt: Math.max(item.startedAt, from),
-      endedAt: Math.min(item.endedAt, to),
+  return [...rows.values()]
+    .sort((a, b) => a.firstStart - b.firstStart)
+    .map((row) => ({
+      key: row.key,
+      label: row.label,
+      assignee: row.assignee,
+      bars: [...row.bars].sort((a, b) => a.leftPercent - b.leftPercent),
     }))
+}
 
-    const { lanes, laneOf } = assignLanes(clipped)
+/** 上部の目盛り。複数日なら日付、1 日なら時刻 */
+export function ganttTicks(bounds: Bounds): GanttTick[] {
+  const days = dayCount(bounds)
 
-    const bars = inDay.map((item, index) => {
-      const leftPercent = ((clipped[index].startedAt - from) / total) * 100
-      const rawWidth = ((clipped[index].endedAt - clipped[index].startedAt) / total) * 100
+  if (days <= 1) {
+    // 日付が 1 つしかないと、どの時間帯かが分からない。
+    // 3 時間ごと。細かくすると文字が重なる
+    return Array.from({ length: 8 }, (_, index) => ({
+      label: `${index * 3}時`,
+      percent: (index * 3 * 100) / 24,
+    }))
+  }
 
-      return {
-        id: item.entry.id,
-        label: item.entry.label,
-        draft: item.entry.draft,
-        leftPercent,
-        widthPercent: Math.min(100 - leftPercent, Math.max(MIN_WIDTH_PERCENT, rawWidth)),
-        timeLabel: `${formatTime(item.startedAt, timezone)}〜${formatTime(item.endedAt, timezone)}`,
-        lane: laneOf[index],
-      }
-    })
+  const from = Date.parse(`${bounds.start}T00:00:00Z`)
 
-    return { date, label: dayLabel(date), lanes, bars }
+  return Array.from({ length: days }, (_, index) => {
+    const date = new Date(from + index * DAY_MS)
+    return {
+      label: `${date.getUTCMonth() + 1}/${date.getUTCDate()}`,
+      percent: (index * 100) / days,
+    }
   })
 }
 
-/** 横軸の目盛り。行の中は必ず 0 時〜24 時 */
-export function ganttHourTicks(): GanttTick[] {
-  // 3 時間ごと。細かくすると文字が重なる
-  return Array.from({ length: 8 }, (_, index) => ({
-    label: `${index * 3}時`,
-    percent: (index * 3 * 100) / 24,
-  }))
+/**
+ * 担当に色を割り当てる。
+ *
+ * 名前の並び順で決めるのではなく、**名前そのものから決める**。
+ * 並び順で変わると、範囲を切り替えるたびに色が入れ替わり、見比べられない。
+ */
+export function assigneeColors(assignees: string[]): Map<string, string> {
+  const colors = new Map<string, string>()
+
+  for (const name of assignees) {
+    if (colors.has(name)) continue
+
+    if (name === UNASSIGNED_LABEL) {
+      colors.set(name, UNASSIGNED_COLOR)
+      continue
+    }
+
+    // 文字コードから決める。同じ名前なら、いつでも同じ色になる
+    let hash = 0
+    for (let index = 0; index < name.length; index++) {
+      hash = (hash * 31 + name.charCodeAt(index)) % 1_000_003
+    }
+    colors.set(name, ASSIGNEE_PALETTE[hash % ASSIGNEE_PALETTE.length])
+  }
+
+  return colors
 }

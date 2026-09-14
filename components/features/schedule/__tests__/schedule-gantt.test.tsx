@@ -9,53 +9,117 @@ const WEEK = { start: '2026-09-13', end: '2026-09-19' }
 const ENTRIES: CalendarEntry[] = [
   {
     id: 'a',
-    label: '資料作成',
+    label: '基礎工事',
+    assignee: '田中',
     startsAt: '2026-09-14T01:00:00.000Z', // 日本時間 10:00
     endsAt: '2026-09-14T03:00:00.000Z',
     draft: false,
   },
+  {
+    id: 'b',
+    label: '内装工事',
+    assignee: '鈴木',
+    startsAt: '2026-09-16T01:00:00.000Z',
+    endsAt: '2026-09-16T05:00:00.000Z',
+    draft: true,
+  },
+  {
+    id: 'c',
+    label: '検査',
+    assignee: '',
+    startsAt: '2026-09-18T01:00:00.000Z',
+    endsAt: '2026-09-18T02:00:00.000Z',
+    draft: false,
+  },
 ]
 
-describe('ScheduleGantt の向き', () => {
-  it('日付は縦に並ぶ。範囲の日数ぶんの見出しが出る', () => {
-    // 日付を横軸に置くと、1 件あたりの棒が細くなり時刻が読み取れない
-    render(<ScheduleGantt entries={ENTRIES} bounds={WEEK} timezone={TZ} today="2026-09-14" />)
+function setup(entries = ENTRIES) {
+  return render(<ScheduleGantt entries={entries} bounds={WEEK} timezone={TZ} />)
+}
 
-    for (const label of ['9/13（日）', '9/14（月）', '9/19（土）']) {
+describe('ScheduleGantt の向き', () => {
+  it('作業工程名が左の縦軸に並ぶ', () => {
+    const { container } = setup()
+
+    // 左の見出し欄に工程名が出ていること
+    for (const name of ['基礎工事', '内装工事', '検査']) {
+      expect(container.querySelector(`[title^="${name}"]`)).not.toBeNull()
+    }
+  })
+
+  it('日付が上部の横軸になる', () => {
+    setup()
+
+    // 範囲の 7 日分が目盛りとして並ぶ
+    for (const label of ['9/13', '9/14', '9/19']) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0)
     }
   })
 
-  it('横軸は時刻の目盛りになる', () => {
-    render(<ScheduleGantt entries={ENTRIES} bounds={WEEK} timezone={TZ} today="2026-09-14" />)
+  it('棒は日付の位置に応じて横に伸びる', () => {
+    const { container } = setup()
 
-    expect(screen.getByText('0時')).toBeInTheDocument()
-    expect(screen.getByText('12時')).toBeInTheDocument()
+    // 左の見出しも同じ語を含むため、棒だけが持つ区切り記号で絞る
+    const bar = container.querySelector('[title*="基礎工事／田中"]') as HTMLElement
+    // 7 日のうち 2 日目なので、左からおよそ 1/7〜2/7 の間
+    const left = Number.parseFloat(bar.style.left)
+    expect(left).toBeGreaterThan(100 / 7)
+    expect(left).toBeLessThan(200 / 7)
+  })
+})
+
+describe('ScheduleGantt の担当による色分け', () => {
+  it('担当ごとに凡例を出す', () => {
+    setup()
+
+    expect(screen.getByText('田中')).toBeInTheDocument()
+    expect(screen.getByText('鈴木')).toBeInTheDocument()
+    // 担当が空のものは未設定として扱う
+    expect(screen.getByText('未設定')).toBeInTheDocument()
   })
 
-  it('予定は、その日の行に入る', () => {
-    const { container } = render(
-      <ScheduleGantt entries={ENTRIES} bounds={WEEK} timezone={TZ} today="2026-09-14" />,
-    )
+  it('担当が違えば違う色になる', () => {
+    const { container } = setup()
 
-    const bar = container.querySelector('[title*="資料作成"]') as HTMLElement | null
-    expect(bar).not.toBeNull()
-    // 日本時間 10:00 開始なので、左から約 41.7%
-    expect(bar?.style.left.startsWith('41.6')).toBe(true)
+    const swatches = [...container.querySelectorAll('span[aria-hidden]')]
+      .map((node) => (node as HTMLElement).style.background)
+      .filter((background) => background.startsWith('rgb'))
+
+    expect(new Set(swatches).size).toBeGreaterThan(1)
   })
 
-  it('棒が短くても内容が分かるよう、一覧も併記する', () => {
-    render(<ScheduleGantt entries={ENTRIES} bounds={WEEK} timezone={TZ} today="2026-09-14" />)
+  it('同じ担当の工程は、同じ色になる', () => {
+    const { container } = setup([
+      ENTRIES[0],
+      { ...ENTRIES[0], id: 'd', label: '追加工事' },
+    ])
+
+    const bars = [...container.querySelectorAll('[title*="田中"]')]
+      .map((node) => (node as HTMLElement).style.background)
+      .filter((background) => background.startsWith('rgb'))
+
+    expect(new Set(bars).size).toBe(1)
+  })
+})
+
+describe('ScheduleGantt の補足表示', () => {
+  it('棒には文字が入らないため、期間を一覧でも出す', () => {
+    setup()
 
     const list = screen.getByRole('list')
-    expect(within(list).getByText(/9\/14（月）.*資料作成/)).toBeInTheDocument()
+    expect(within(list).getByText(/基礎工事／田中/)).toBeInTheDocument()
+  })
+
+  it('仮案は「仮」と分かるようにする', () => {
+    setup()
+
+    const list = screen.getByRole('list')
+    expect(within(list).getByText(/内装工事.*（仮）/)).toBeInTheDocument()
   })
 
   it('予定が無ければ、その旨を伝える', () => {
-    render(<ScheduleGantt entries={[]} bounds={WEEK} timezone={TZ} today="2026-09-14" />)
+    setup([])
 
     expect(screen.getByText('この期間に予定はありません。')).toBeInTheDocument()
-    // 予定が無くても日付の軸は出す。途切れると範囲が分からなくなる
-    expect(screen.getAllByText('9/13（日）').length).toBeGreaterThan(0)
   })
 })

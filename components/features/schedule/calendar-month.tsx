@@ -9,6 +9,8 @@ const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 export type CalendarEntry = {
   id: string
   label: string
+  /** 担当。ガントチャートの色分けに使う。空文字は未設定 */
+  assignee: string
   startsAt: string
   endsAt: string
   /** 仮案は破線で表示し「仮」バッジを付ける */

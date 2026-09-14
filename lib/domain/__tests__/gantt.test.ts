@@ -1,159 +1,168 @@
 import { describe, expect, it } from 'vitest'
-import { buildGanttDayRows, ganttHourTicks } from '../gantt'
+import {
+  UNASSIGNED_LABEL,
+  assigneeColors,
+  buildGanttTaskRows,
+  ganttTicks,
+} from '../gantt'
 
 const TZ = 'Asia/Tokyo'
 const DAY = { start: '2026-09-14', end: '2026-09-14' }
 const WEEK = { start: '2026-09-13', end: '2026-09-19' }
 
-function entry(startsAt: string, endsAt: string, overrides: Record<string, unknown> = {}) {
-  return { id: 'e1', label: '資料作成', startsAt, endsAt, draft: false, ...overrides }
+function entry(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'e1',
+    label: '基礎工事',
+    assignee: '田中',
+    startsAt: '2026-09-14T01:00:00Z',
+    endsAt: '2026-09-14T03:00:00Z',
+    draft: false,
+    ...overrides,
+  }
 }
 
-describe('buildGanttDayRows', () => {
-  it('行は日付ごとに作る', () => {
-    // 日付の軸を縦にするため、1 日 = 1 行とする
-    expect(buildGanttDayRows([], WEEK, TZ)).toHaveLength(7)
-    expect(buildGanttDayRows([], DAY, TZ)).toHaveLength(1)
-  })
-
-  it('行は範囲の順に並ぶ', () => {
-    const rows = buildGanttDayRows([], WEEK, TZ)
-    expect(rows[0].date).toBe('2026-09-13')
-    expect(rows[6].date).toBe('2026-09-19')
-  })
-
-  it('左に出す日付の見出しを添える', () => {
-    const rows = buildGanttDayRows([], DAY, TZ)
-    expect(rows[0].label).toContain('9/14')
-    expect(rows[0].label).toContain('月')
-  })
-
-  it('予定を、その日の行に入れる', () => {
-    // 日本時間 10:00〜12:00
-    const rows = buildGanttDayRows(
-      [entry('2026-09-14T01:00:00Z', '2026-09-14T03:00:00Z')],
+describe('buildGanttTaskRows', () => {
+  it('行は作業工程ごとに作る', () => {
+    // 左の縦軸は工程名。同じ工程は 1 行にまとめる
+    const rows = buildGanttTaskRows(
+      [
+        entry({ id: 'a' }),
+        entry({ id: 'b', startsAt: '2026-09-16T01:00:00Z', endsAt: '2026-09-16T03:00:00Z' }),
+        entry({ id: 'c', label: '内装', assignee: '鈴木' }),
+      ],
       WEEK,
       TZ,
     )
-    expect(rows.find((row) => row.date === '2026-09-14')?.bars).toHaveLength(1)
-    expect(rows.find((row) => row.date === '2026-09-13')?.bars).toHaveLength(0)
+
+    expect(rows).toHaveLength(2)
+    expect(rows.find((row) => row.label === '基礎工事')?.bars).toHaveLength(2)
   })
 
-  it('位置と幅は、その日の 0 時〜24 時に対する割合', () => {
-    // 日本時間 12:00 開始なら、ちょうど半分の位置
-    const [row] = buildGanttDayRows(
-      [entry('2026-09-14T03:00:00Z', '2026-09-14T09:00:00Z')],
-      DAY,
+  it('担当が違えば別の行にする', () => {
+    // 同じ工程でも担当が違えば、色も責任も別
+    const rows = buildGanttTaskRows(
+      [entry({ id: 'a' }), entry({ id: 'b', assignee: '鈴木' })],
+      WEEK,
       TZ,
     )
-    expect(row.bars[0].leftPercent).toBeCloseTo(50, 5)
-    expect(row.bars[0].widthPercent).toBeCloseTo(25, 5)
+    expect(rows).toHaveLength(2)
   })
 
-  it('日をまたぐ予定は、日ごとに切って両方の行へ入れる', () => {
-    // 日本時間 9/14 22:00 〜 9/15 02:00
-    const rows = buildGanttDayRows(
-      [entry('2026-09-14T13:00:00Z', '2026-09-14T17:00:00Z')],
-      { start: '2026-09-14', end: '2026-09-15' },
-      TZ,
-    )
-    expect(rows[0].bars).toHaveLength(1)
-    expect(rows[1].bars).toHaveLength(1)
-    // 前の日は末尾まで、次の日は先頭から
-    expect(rows[0].bars[0].leftPercent + rows[0].bars[0].widthPercent).toBeCloseTo(100, 5)
-    expect(rows[1].bars[0].leftPercent).toBeCloseTo(0, 5)
-  })
-
-  it('範囲外の予定は入らない', () => {
-    const rows = buildGanttDayRows(
-      [entry('2026-09-25T01:00:00Z', '2026-09-25T02:00:00Z')],
-      DAY,
-      TZ,
-    )
-    expect(rows[0].bars).toHaveLength(0)
-  })
-
-  it('重なる予定は段を分ける', () => {
-    // 同じ段に置くと、片方が隠れて見えなくなる
-    const [row] = buildGanttDayRows(
+  it('行は最初に始まる工程から並べる', () => {
+    const rows = buildGanttTaskRows(
       [
-        entry('2026-09-14T01:00:00Z', '2026-09-14T04:00:00Z', { id: 'a' }),
-        entry('2026-09-14T02:00:00Z', '2026-09-14T05:00:00Z', { id: 'b' }),
+        entry({ id: 'a', label: '後の工程', startsAt: '2026-09-17T01:00:00Z', endsAt: '2026-09-17T02:00:00Z' }),
+        entry({ id: 'b', label: '先の工程', startsAt: '2026-09-14T01:00:00Z', endsAt: '2026-09-14T02:00:00Z' }),
       ],
-      DAY,
+      WEEK,
       TZ,
     )
-    expect(row.lanes).toBe(2)
-    expect(row.bars.map((bar) => bar.lane)).toEqual([0, 1])
+    expect(rows.map((row) => row.label)).toEqual(['先の工程', '後の工程'])
   })
 
-  it('重ならない予定は同じ段に置く', () => {
-    const [row] = buildGanttDayRows(
-      [
-        entry('2026-09-14T01:00:00Z', '2026-09-14T02:00:00Z', { id: 'a' }),
-        entry('2026-09-14T03:00:00Z', '2026-09-14T04:00:00Z', { id: 'b' }),
-      ],
-      DAY,
+  it('位置と幅は、範囲全体に対する割合', () => {
+    // 7 日の範囲で 2 日目の丸 1 日なら、左は約 1/7
+    const rows = buildGanttTaskRows(
+      [entry({ startsAt: '2026-09-13T15:00:00Z', endsAt: '2026-09-14T15:00:00Z' })],
+      WEEK,
       TZ,
     )
-    expect(row.lanes).toBe(1)
-    expect(row.bars.every((bar) => bar.lane === 0)).toBe(true)
+    expect(rows[0].bars[0].leftPercent).toBeCloseTo(100 / 7, 4)
+    expect(rows[0].bars[0].widthPercent).toBeCloseTo(100 / 7, 4)
   })
 
-  it('予定が無い行の段数は 1', () => {
-    // 高さが 0 になると、日付の軸が途切れて見える
-    expect(buildGanttDayRows([], DAY, TZ)[0].lanes).toBe(1)
-  })
-
-  it('開始が早いものから並べる', () => {
-    const [row] = buildGanttDayRows(
-      [
-        entry('2026-09-14T05:00:00Z', '2026-09-14T06:00:00Z', { id: 'late' }),
-        entry('2026-09-14T01:00:00Z', '2026-09-14T02:00:00Z', { id: 'early' }),
-      ],
-      DAY,
+  it('範囲からはみ出す予定は、端で切る', () => {
+    const rows = buildGanttTaskRows(
+      [entry({ startsAt: '2026-09-01T00:00:00Z', endsAt: '2026-09-30T00:00:00Z' })],
+      WEEK,
       TZ,
     )
-    expect(row.bars.map((bar) => bar.id)).toEqual(['early', 'late'])
+    expect(rows[0].bars[0].leftPercent).toBe(0)
+    expect(rows[0].bars[0].widthPercent).toBeCloseTo(100, 4)
+  })
+
+  it('範囲外の予定は行ごと出さない', () => {
+    expect(
+      buildGanttTaskRows(
+        [entry({ startsAt: '2026-10-01T01:00:00Z', endsAt: '2026-10-01T02:00:00Z' })],
+        WEEK,
+        TZ,
+      ),
+    ).toHaveLength(0)
+  })
+
+  it('担当が無ければ、未設定として扱う', () => {
+    const rows = buildGanttTaskRows([entry({ assignee: '' })], WEEK, TZ)
+    expect(rows[0].assignee).toBe(UNASSIGNED_LABEL)
   })
 
   it('とても短い予定でも、見える幅を確保する', () => {
-    const [row] = buildGanttDayRows(
-      [entry('2026-09-14T01:00:00Z', '2026-09-14T01:00:30Z')],
-      DAY,
+    const rows = buildGanttTaskRows(
+      [entry({ startsAt: '2026-09-14T01:00:00Z', endsAt: '2026-09-14T01:00:30Z' })],
+      WEEK,
       TZ,
     )
-    expect(row.bars[0].widthPercent).toBeGreaterThan(0)
+    expect(rows[0].bars[0].widthPercent).toBeGreaterThan(0)
   })
 
   it('開始と終了が逆でも壊れない', () => {
-    const [row] = buildGanttDayRows(
-      [entry('2026-09-14T05:00:00Z', '2026-09-14T01:00:00Z')],
-      DAY,
+    const rows = buildGanttTaskRows(
+      [entry({ startsAt: '2026-09-14T05:00:00Z', endsAt: '2026-09-14T01:00:00Z' })],
+      WEEK,
       TZ,
     )
-    expect(row.bars.every((bar) => bar.widthPercent >= 0)).toBe(true)
+    expect(rows[0].bars[0].widthPercent).toBeGreaterThan(0)
   })
 
-  it('仮案かどうかと、時刻の表示を引き継ぐ', () => {
-    const [row] = buildGanttDayRows(
-      [entry('2026-09-14T01:00:00Z', '2026-09-14T03:00:00Z', { draft: true })],
-      DAY,
-      TZ,
-    )
-    expect(row.bars[0].draft).toBe(true)
-    expect(row.bars[0].timeLabel).toMatch(/\d{2}:\d{2}/)
+  it('仮案かどうかと、期間の表示を引き継ぐ', () => {
+    const rows = buildGanttTaskRows([entry({ draft: true })], WEEK, TZ)
+    expect(rows[0].bars[0].draft).toBe(true)
+    expect(rows[0].bars[0].timeLabel).toMatch(/9\/14/)
   })
 })
 
-describe('ganttHourTicks', () => {
-  it('1 日ぶんの時刻の目盛りを返す', () => {
-    const ticks = ganttHourTicks()
+describe('ganttTicks', () => {
+  it('複数日の範囲では、日付を上部の目盛りにする', () => {
+    const ticks = ganttTicks(WEEK)
+    expect(ticks).toHaveLength(7)
+    expect(ticks[0].label).toContain('13')
+  })
+
+  it('1 日の範囲では、時刻の目盛りにする', () => {
+    // 日付が 1 つしかないと、どの時間帯かが分からない
+    const ticks = ganttTicks(DAY)
     expect(ticks.length).toBeGreaterThan(2)
     expect(ticks[0].label).toContain('0')
   })
 
   it('目盛りは 0〜100 の割合に収まる', () => {
-    expect(ganttHourTicks().every((tick) => tick.percent >= 0 && tick.percent < 100)).toBe(true)
+    expect(ganttTicks(WEEK).every((tick) => tick.percent >= 0 && tick.percent < 100)).toBe(true)
+  })
+})
+
+describe('assigneeColors', () => {
+  it('担当ごとに違う色を割り当てる', () => {
+    const colors = assigneeColors(['田中', '鈴木'])
+    expect(colors.get('田中')).not.toBe(colors.get('鈴木'))
+  })
+
+  it('同じ担当には、いつも同じ色を割り当てる', () => {
+    // 並び順で色が変わると、日をまたいで見比べられない
+    const first = assigneeColors(['田中', '鈴木'])
+    const second = assigneeColors(['鈴木', '田中'])
+    expect(first.get('田中')).toBe(second.get('田中'))
+  })
+
+  it('担当が多くても色を返す', () => {
+    const many = Array.from({ length: 20 }, (_, index) => `担当${index}`)
+    const colors = assigneeColors(many)
+    expect(colors.size).toBe(20)
+    expect([...colors.values()].every((color) => color.startsWith('#'))).toBe(true)
+  })
+
+  it('未設定には目立たない色を割り当てる', () => {
+    const colors = assigneeColors([UNASSIGNED_LABEL, '田中'])
+    expect(colors.get(UNASSIGNED_LABEL)).not.toBe(colors.get('田中'))
   })
 })
