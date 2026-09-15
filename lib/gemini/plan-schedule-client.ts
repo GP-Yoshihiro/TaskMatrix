@@ -1,9 +1,12 @@
 import { GoogleGenAI } from '@google/genai'
 import { attemptTimeout, deadlineFrom } from '@/lib/domain/ai-budget'
+import { describeAiFailure, isQuotaError, isRetryableAiError } from '@/lib/domain/ai-failure'
+import { resolveModelOrder } from '@/lib/domain/model-order'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { AiUsage } from '@/lib/domain/usage'
 import { readUsage } from './usage'
 import { TimeoutError, withTimeout } from './with-timeout'
+import { withThinkingLevel } from './with-thinking'
 import {
   SCHEDULE_SCHEMA,
   type RawSchedule,
@@ -22,31 +25,16 @@ export interface SchedulePlanner {
   plan(input: SchedulePromptInput): Promise<Result<PlanResult>>
 }
 
-/*
- * 既定は**速い方を先**にする。
- *
- * 2026-09-14 の実測で、gemini-3.7-flash は「はい」と返すだけで
- * 47.6 秒 / 115.9 秒かかり、3 回目は 429 で拒否された。
- * gemini-3.5-flash は同じ問いに 3〜4 秒で返る。
- *
- * 環境変数で上書きできるが、**遅いモデルを指定すると中断しやすくなる。**
- */
-const DEFAULT_MODEL = 'gemini-3.5-flash'
-const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash'
-
-/**
- * 応答が返らないまま固まるのを防ぐ。
- * 実測では 20〜31 秒で完了するため、その 3 倍程度を上限とする。
- * Server Action の maxDuration (120 秒) より短くし、
- * 打ち切られる前に日本語のエラーを返せるようにする。
- */
 // 1 回ごとの上限は置かない。全体の持ち時間から、その都度分け与える
 
-function isRetryable(error: unknown): boolean {
-  if (error instanceof TimeoutError) return true
-  const status = (error as { status?: number })?.status
-  return status === 429 || status === 500 || status === 502 || status === 503
-}
+/**
+ * 思考の深さ。
+ *
+ * Gemini 3 系は既定で深く考える。スケジュールの割り付けは
+ * **手順が決まっており、深い思考より出力量のほうが時間を支配する。**
+ * 浅くして、その分を出力に回す。
+ */
+const THINKING_LEVEL = 'low'
 
 /**
  * Gemini によるスケジュール算出。
@@ -61,10 +49,12 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
       }
 
       const ai = new GoogleGenAI({ apiKey })
-      const models = [
-        process.env.GEMINI_MODEL || DEFAULT_MODEL,
-        process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
-      ].filter((model, index, all) => all.indexOf(model) === index)
+      // 環境変数で遅いモデルを両方に指定すると候補が 1 つに潰れていた。
+      // 速いモデルが必ず候補に残るようにする
+      const models = resolveModelOrder(
+        process.env.GEMINI_MODEL,
+        process.env.GEMINI_FALLBACK_MODEL,
+      )
 
       const promptText = buildSchedulePrompt(input)
       const contents = [{ type: 'text', text: promptText }]
@@ -73,6 +63,7 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
       // 1 回ごとに上限を置くと、予備のモデルを試した合計が画面側の上限を超える
       const deadlineAt = deadlineFrom(Date.now())
       let ranOutOfTime = false
+      let hitQuota = false
 
       for (const [index, model] of models.entries()) {
         // 残りを、これから試す回数で分ける。
@@ -86,15 +77,20 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
 
         try {
           const interaction = await withTimeout(
-            ai.interactions.create({
-            model,
-            input: contents,
-            response_format: {
-              type: 'text',
-              mime_type: 'application/json',
-              schema: SCHEDULE_SCHEMA,
-            },
-            } as Parameters<typeof ai.interactions.create>[0]),
+            withThinkingLevel(
+              (params) =>
+                ai.interactions.create(params as Parameters<typeof ai.interactions.create>[0]),
+              {
+                model,
+                input: contents,
+                response_format: {
+                  type: 'text',
+                  mime_type: 'application/json',
+                  schema: SCHEDULE_SCHEMA,
+                },
+              },
+              THINKING_LEVEL,
+            ),
             timeoutMs,
           )
 
@@ -108,7 +104,8 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
           })
         } catch (error) {
           if (error instanceof TimeoutError) ranOutOfTime = true
-          if (!isRetryable(error)) {
+          if (isQuotaError(error)) hitQuota = true
+          if (!isRetryableAiError(error)) {
             return err(
               'AI_REQUEST_FAILED',
               'AI への問い合わせに失敗しました。時間をおいてお試しください。',
@@ -117,14 +114,10 @@ export function createGeminiSchedulePlanner(): SchedulePlanner {
         }
       }
 
-      if (ranOutOfTime) {
-        return err(
-          'AI_TIMEOUT',
-          'スケジュールの算出に時間がかかりすぎたため、中断しました。対象を減らしてお試しください。',
-        )
-      }
-
-      return err('AI_MODEL_UNAVAILABLE', 'AI が混雑しています。時間をおいてお試しください。')
+      // 上限・時間切れ・混雑を区別して伝える。
+      // どれも「混雑しています」では、待つべきかどうかが判断できない
+      const failure = describeAiFailure({ ranOutOfTime, hitQuota })
+      return err(failure.code, failure.message)
     },
   }
 }

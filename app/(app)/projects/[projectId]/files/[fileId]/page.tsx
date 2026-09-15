@@ -12,7 +12,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { loadEstimate } from '@/lib/usecases/load-estimate'
 
 /** AI 抽出は 20 秒以上かかることがあるため、実行時間の上限を延ばす */
-export const maxDuration = 120
+export const maxDuration = 300
 
 export default async function FilePage({
   params,

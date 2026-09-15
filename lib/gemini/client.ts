@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { attemptTimeout, deadlineFrom } from '@/lib/domain/ai-budget'
+import { describeAiFailure, isQuotaError, isRetryableAiError } from '@/lib/domain/ai-failure'
+import { resolveModelOrder } from '@/lib/domain/model-order'
 import { type Result, err, ok } from '@/lib/domain/result'
 import type { AiUsage } from '@/lib/domain/usage'
 import { readUsage } from './usage'
@@ -21,32 +23,7 @@ export interface TaskExtractor {
   extract(input: { text: string } | { pdf: Uint8Array }): Promise<Result<ExtractionResult>>
 }
 
-/*
- * 既定は**速い方を先**にする。
- *
- * 2026-09-14 の実測で、gemini-3.7-flash は「はい」と返すだけで
- * 47.6 秒 / 115.9 秒かかり、3 回目は 429 で拒否された。
- * gemini-3.5-flash は同じ問いに 3〜4 秒で返る。
- *
- * 環境変数で上書きできるが、**遅いモデルを指定すると中断しやすくなる。**
- */
-const DEFAULT_MODEL = 'gemini-3.5-flash'
-const DEFAULT_FALLBACK_MODEL = 'gemini-3.7-flash'
-
-/** 混雑・レート制限は別モデルで再試行する価値がある */
-/**
- * 応答が返らないまま固まるのを防ぐ。
- * 実測では 20〜31 秒で完了するため、その 3 倍程度を上限とする。
- * Server Action の maxDuration (120 秒) より短くし、
- * 打ち切られる前に日本語のエラーを返せるようにする。
- */
 // 1 回ごとの上限は置かない。全体の持ち時間から、その都度分け与える
-
-function isRetryable(error: unknown): boolean {
-  if (error instanceof TimeoutError) return true
-  const status = (error as { status?: number })?.status
-  return status === 429 || status === 500 || status === 502 || status === 503
-}
 
 /**
  * Gemini によるタスク抽出。
@@ -64,10 +41,12 @@ export function createGeminiTaskExtractor(): TaskExtractor {
 
       const ai = new GoogleGenAI({ apiKey })
 
-      const models = [
-        process.env.GEMINI_MODEL || DEFAULT_MODEL,
-        process.env.GEMINI_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL,
-      ].filter((model, index, all) => all.indexOf(model) === index)
+      // 環境変数で遅いモデルを両方に指定すると候補が 1 つに潰れていた。
+      // 速いモデルが必ず候補に残るようにする
+      const models = resolveModelOrder(
+        process.env.GEMINI_MODEL,
+        process.env.GEMINI_FALLBACK_MODEL,
+      )
 
       // PDF は本体を送るため文字数を測れない。推定せず 0 とする
       const inputChars = 'pdf' in input ? 0 : input.text.length
@@ -88,6 +67,7 @@ export function createGeminiTaskExtractor(): TaskExtractor {
       // 1 回ごとに上限を置くと、予備のモデルを試した合計が画面側の上限を超える
       const deadlineAt = deadlineFrom(Date.now())
       let ranOutOfTime = false
+      let hitQuota = false
 
       for (const [index, model] of models.entries()) {
         // 残りを、これから試す回数で分ける。
@@ -123,7 +103,8 @@ export function createGeminiTaskExtractor(): TaskExtractor {
           })
         } catch (error) {
           if (error instanceof TimeoutError) ranOutOfTime = true
-          if (!isRetryable(error)) {
+          if (isQuotaError(error)) hitQuota = true
+          if (!isRetryableAiError(error)) {
             return err(
               'AI_REQUEST_FAILED',
               'AI への問い合わせに失敗しました。時間をおいてお試しください。',
@@ -133,14 +114,14 @@ export function createGeminiTaskExtractor(): TaskExtractor {
         }
       }
 
-      if (ranOutOfTime) {
-        return err(
-          'AI_TIMEOUT',
+      // 上限・時間切れ・混雑を区別して伝える
+      const failure = describeAiFailure({
+        ranOutOfTime,
+        hitQuota,
+        timeoutMessage:
           'タスクの抽出に時間がかかりすぎたため、中断しました。対象を減らしてお試しください。',
-        )
-      }
-
-      return err('AI_MODEL_UNAVAILABLE', 'AI が混雑しています。時間をおいてお試しください。')
+      })
+      return err(failure.code, failure.message)
     },
   }
 }
